@@ -20,11 +20,17 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.alexmagarea.snackaf0a9de196754459b1c8d7f0f860bed8"
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "description": "Găsește ture. Găsește oameni."
+    "description": "Găsește ture. Găsește oameni.",
+    "extra": {
+      "eas": {
+        "projectId": "d1694935-4e6d-4d2c-9b23-ee8ca8bb451d"
+      }
+    }
   }
 }
