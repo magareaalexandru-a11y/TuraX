@@ -34,11 +34,12 @@ export default function App() {
 
           <TextInput
             placeholder="Nume complet"
+            placeholderTextColor= "#8A8F98"
             style={styles.input}
           />
-
-          <TextInput
+<TextInput
             placeholder="Oraș"
+            placeholderTextColor="#8A8F98"
             style={styles.input}
           />
 
