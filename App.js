@@ -15,6 +15,7 @@ const supabaseKey = 'sb_publishable_KJkUOxPP0_8JFtbTzWN0oA_qGA_gtcm';
 const supabase = createClient(supabaseUrl, supabaseKey);
 export default function App() {
   const [screen, setScreen] = useState('home');
+  const [negotiable, setNegotiable] = useState(true);
 
   // ECRAN OSPĂTAR
   if (screen === 'waiter') {
@@ -45,18 +46,47 @@ export default function App() {
 
           <TextInput
             placeholder="Ani de experiență"
+        placeholderTextColor="#9CA3AF"
             keyboardType="numeric"
             style={styles.input}
           />
 
+          <Text style={{fontSize:16,fontWeight:"600",marginBottom:8,color:"#6B7280"}}>Interval tarifar dorit</Text>
+      {negotiable ? (
+        <View style={{flexDirection:"row",gap:10,marginBottom:12}}>
           <TextInput
-            placeholder="Tarif minim dorit / tură"
+            placeholder="De la (lei/tură)"
+            placeholderTextColor="#9CA3AF"
             keyboardType="numeric"
-            style={styles.input}
+            style={[styles.input,{flex:1,marginBottom:0}]}
           />
-
           <TextInput
+            placeholder="Până la (lei/tură)"
+            placeholderTextColor="#9CA3AF"
+            keyboardType="numeric"
+            style={[styles.input,{flex:1,marginBottom:0}]}
+          />
+        </View>
+      ) : (
+        <TextInput
+          placeholder="Tarif dorit (lei/tură)"
+          placeholderTextColor="#9CA3AF"
+          keyboardType="numeric"
+          style={styles.input}
+        />
+      )}
+      <View style={{flexDirection:"row",gap:10,marginBottom:16}}>
+        <TouchableOpacity onPress={()=>setNegotiable(true)} style={{flex:1,padding:14,borderRadius:12,borderWidth:1,borderColor:negotiable?"#111827":"#D1D5DB",alignItems:"center",backgroundColor:negotiable?"#111827":"#FFFFFF"}}>
+          <Text style={{fontWeight:"600",color:negotiable?"#FFFFFF":"#111827"}}>Negociabil</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={()=>setNegotiable(false)} style={{flex:1,padding:14,borderRadius:12,borderWidth:1,borderColor:!negotiable?"#111827":"#D1D5DB",alignItems:"center",backgroundColor:!negotiable?"#111827":"#FFFFFF"}}>
+          <Text style={{fontWeight:"600",color:!negotiable?"#FFFFFF":"#111827"}}>Tarif fix</Text>
+        </TouchableOpacity>
+      </View>
+
+      <TextInput
             placeholder="Descriere scurtă despre tine"
+        placeholderTextColor="#9CA3AF"
             multiline
             style={[styles.input, styles.textArea]}
           />
