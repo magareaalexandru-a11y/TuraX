@@ -1,3 +1,4 @@
+import { Picker } from "@react-native-picker/picker";
 import 'react-native-url-polyfill/auto'
 import React, { useState } from 'react';
 import {
@@ -16,6 +17,10 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 export default function App() {
   const [screen, setScreen] = useState('home');
   const [negotiable, setNegotiable] = useState(true);
+  const [workTypes, setWorkTypes] = useState([]);
+  const [horecaSkills, setHorecaSkills] = useState([]);
+  const [availableDays, setAvailableDays] = useState([]);
+  const [dayAvailability, setDayAvailability] = useState({});
 
   // ECRAN OSPĂTAR
   if (screen === 'waiter') {
@@ -51,7 +56,121 @@ export default function App() {
             style={styles.input}
           />
 
-          <Text style={{fontSize:16,fontWeight:"600",marginBottom:8,color:"#6B7280"}}>Interval tarifar dorit</Text>
+      <Text style={{fontSize:16,fontWeight:"600",marginBottom:8,color:"#6B7280"}}>Experiență în</Text>
+      <View style={{flexDirection:"row",flexWrap:"wrap",gap:8,marginBottom:16}}>
+        {["Restaurant","Bar / Pub","Cafenea","Hotel","Evenimente (nunți, botezuri etc.)"].map((item)=>(
+          <TouchableOpacity key={item} onPress={()=>setWorkTypes(prev=>prev.includes(item)?prev.filter(x=>x!==item):[...prev,item])} style={{paddingVertical:10,paddingHorizontal:14,borderRadius:20,borderWidth:1,borderColor:workTypes.includes(item)?"#111827":"#D1D5DB",backgroundColor:workTypes.includes(item)?"#111827":"#FFFFFF"}}>
+            <Text style={{fontWeight:"600",color:workTypes.includes(item)?"#FFFFFF":"#111827"}}>{item}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      <Text style={{fontSize:16,fontWeight:"600",marginBottom:8,color:"#6B7280"}}>Competențe HoReCa</Text>
+      <View style={{flexDirection:"row",flexWrap:"wrap",gap:8,marginBottom:16}}>
+        {["Servire à la carte","POS / Casă de marcat","Servire băuturi","Preparare băuturi / Bar","Gestionare mese","Evenimente","Lucru în echipă"].map((item)=>(
+          <TouchableOpacity key={item} onPress={()=>setHorecaSkills(prev=>prev.includes(item)?prev.filter(x=>x!==item):[...prev,item])} style={{paddingVertical:10,paddingHorizontal:14,borderRadius:20,borderWidth:1,borderColor:horecaSkills.includes(item)?"#111827":"#D1D5DB",backgroundColor:horecaSkills.includes(item)?"#111827":"#FFFFFF"}}>
+            <Text style={{fontWeight:"600",color:horecaSkills.includes(item)?"#FFFFFF":"#111827"}}>{item}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+          <Text style={{fontSize:16,fontWeight:"600",marginBottom:8,color:"#6B7280"}}>Zile disponibile</Text>
+      <Text style={{fontSize:13,color:"#9CA3AF",marginBottom:10}}>Selectează zilele în care poți accepta ture</Text>
+      <View style={{flexDirection:"row",flexWrap:"wrap",gap:8,marginBottom:16}}>
+        {["Lun","Mar","Mie","Joi","Vin","Sâm","Dum"].map((day)=>(
+          <TouchableOpacity
+            key={day}
+            onPress={()=>setAvailableDays(prev=>prev.includes(day)?prev.filter(x=>x!==day):[...prev,day])}
+            style={{
+              paddingVertical:10,
+              paddingHorizontal:14,
+              borderRadius:20,
+              borderWidth:1,
+              borderColor:availableDays.includes(day)?"#111827":"#D1D5DB",
+              backgroundColor:availableDays.includes(day)?"#111827":"#FFFFFF"
+            }}
+          >
+            <Text style={{fontWeight:"600",color:availableDays.includes(day)?"#FFFFFF":"#111827"}}>{day}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {availableDays.length > 0 && (
+        <View style={{marginBottom:16}}>
+          {availableDays.map((day) => {
+            const info = dayAvailability[day] || {mode:"all",start:"",end:""};
+            const setMode = (mode) => setDayAvailability(prev => ({
+              ...prev,
+              [day]: {...(prev[day] || {}), mode}
+            }));
+            return (
+              <View key={day} style={{borderWidth:1,borderColor:"#E5E7EB",borderRadius:14,padding:12,marginBottom:10}}>
+                <Text style={{fontSize:15,fontWeight:"700",marginBottom:10}}>{day}</Text>
+
+                <View style={{flexDirection:"row",flexWrap:"wrap",gap:8}}>
+                  {[
+                    ["all","Toată ziua"],
+                    ["first","09⁰⁰–16⁰⁰"],
+                    ["second","17⁰⁰–00⁰⁰"],
+                    ["custom","Personalizat"]
+                  ].map(([mode,label]) => (
+                    <TouchableOpacity
+                      key={mode}
+                      onPress={()=>setMode(mode)}
+                      style={{
+                        paddingVertical:9,
+                        paddingHorizontal:12,
+                        borderRadius:18,
+                        borderWidth:1,
+                        borderColor:info.mode===mode?"#111827":"#D1D5DB",
+                        backgroundColor:info.mode===mode?"#111827":"#FFFFFF"
+                      }}
+                    >
+                      <Text style={{fontWeight:"600",color:info.mode===mode?"#FFFFFF":"#111827"}}>{label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {info.mode==="custom" && (
+                  <View style={{flexDirection:"row",gap:8,marginTop:10}}>
+                    <View style={{flex:1,borderWidth:1,borderColor:"#D1D5DB",borderRadius:12,overflow:"hidden",backgroundColor:"#FFFFFF"}}>
+<Picker
+  selectedValue={info.start || ""}
+  onValueChange={(value)=>setDayAvailability(prev=>({...prev,[day]:{...(prev[day]||{}),mode:"custom",start:value}}))}
+  style={{height:50,color:"#111827"}}
+>
+  <Picker.Item label="De la" value="" />
+  {Array.from({length:16},(_,i)=>i+8).map(h=>{
+    const ora=String(h).padStart(2,"0")+":00";
+    return <Picker.Item key={ora} label={ora.replace(":00","⁰⁰")} value={ora} />;
+  })}
+</Picker>
+</View>
+                    <View style={{flex:1,borderWidth:1,borderColor:"#D1D5DB",borderRadius:12,overflow:"hidden",backgroundColor:"#FFFFFF"}}>
+<Picker
+  selectedValue={info.end || ""}
+  onValueChange={(value)=>setDayAvailability(prev=>({...prev,[day]:{...(prev[day]||{}),mode:"custom",end:value}}))}
+  style={{height:50,color:"#111827"}}
+>
+  <Picker.Item label="Până la" value="" />
+  {(info.start
+    ? Array.from({length:16},(_,i)=>(parseInt(info.start,10)+i+1)%24)
+    : Array.from({length:17},(_,i)=>(i+8)%24)
+  ).map(hour=>{
+    const ora=String(hour).padStart(2,"0")+":00";
+    return <Picker.Item key={ora+"end"} label={ora.replace(":00","⁰⁰")} value={ora} />;
+  })}
+</Picker>
+</View>
+                  </View>
+                )}
+              </View>
+            );
+          })}
+        </View>
+      )}
+
+      <Text style={{fontSize:16,fontWeight:"600",marginBottom:8,color:"#6B7280"}}>Interval tarifar dorit</Text>
       {negotiable ? (
         <View style={{flexDirection:"row",gap:10,marginBottom:12}}>
           <TextInput
