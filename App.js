@@ -1,3 +1,4 @@
+import 'react-native-url-polyfill/auto'
 import React, { useState } from 'react';
 import {
   StyleSheet,
