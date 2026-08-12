@@ -1,6 +1,8 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Picker } from "@react-native-picker/picker";
 import 'react-native-url-polyfill/auto'
-import React, { useState } from 'react';
+import { Calendar } from "react-native-calendars";
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   Text,
@@ -15,14 +17,267 @@ const supabaseUrl = 'https://hfqijvzfjmuysuwdoxej.supabase.co';
 const supabaseKey = 'sb_publishable_KJkUOxPP0_8JFtbTzWN0oA_qGA_gtcm';
 const supabase = createClient(supabaseUrl, supabaseKey);
 export default function App() {
+  const [session, setSession] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [authMode, setAuthMode] = useState('login');
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authName, setAuthName] = useState('');
+  const [authRole, setAuthRole] = useState(null);
+  const [authMessage, setAuthMessage] = useState('');
+  const [posts, setPosts] = useState([]);
+
+  const handleLogin = async () => {
+    setAuthMessage('');
+    const { error } = await supabase.auth.signInWithPassword({
+      email: authEmail.trim(),
+      password: authPassword,
+    });
+    if (error) setAuthMessage(error.message);
+  };
+  const handleSignUp = async () => { setAuthMessage("Se creează..."); const { error } = await supabase.auth.signUp({ email: authEmail.trim(), password: authPassword }); if (error) setAuthMessage(error.message); else setAuthMessage("Cont creat!"); };
+
+  useEffect(() => {
+    const loadRole = async (currentSession) => {
+      if (!currentSession?.user?.id) {
+        setAuthRole(null);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', currentSession.user.id)
+        .single();
+
+      if (error) {
+        console.log('Profile role error:', error.message);
+        setAuthRole(null);
+        return;
+      }
+
+      setAuthRole(data?.role ?? null);
+    };
+
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      loadRole(data.session);
+      setAuthLoading(false);
+    });
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      setSession(newSession);
+      loadRole(newSession);
+      setAuthLoading(false);
+    });
+
+    return () => listener.subscription.unsubscribe();
+  }, []);
   const [screen, setScreen] = useState('home');
   const [negotiable, setNegotiable] = useState(true);
   const [workTypes, setWorkTypes] = useState([]);
+  const [locationName, setLocationName] = useState("");
+  const [locationType, setLocationType] = useState("");
+  const [locationCity, setLocationCity] = useState("");
+  const [locationAddress, setLocationAddress] = useState("");
+  const [contactName, setContactName] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
   const [horecaSkills, setHorecaSkills] = useState([]);
   const [availableDays, setAvailableDays] = useState([]);
   const [dayAvailability, setDayAvailability] = useState({});
+  const [tarifMin, setTarifMin] = useState("");
+  const [tarifMax, setTarifMax] = useState("");
+  const [tarifFix, setTarifFix] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [selectedDates, setSelectedDates] = useState([]);
+  const [city, setCity] = useState("");
+  const [experience, setExperience] = useState("");
+  const [description, setDescription] = useState("");
 
   // ECRAN OSPĂTAR
+  const saveProfile = async () => {
+    const profile = {
+      fullName,
+      city,
+      experience,
+      description,
+      workTypes,
+      horecaSkills,
+    };
+
+    await AsyncStorage.setItem("turax_waiter_profile", JSON.stringify(profile));
+  };
+
+  const saveManagerProfile = async () => {
+    const managerProfile = {
+      locationName,
+      locationType,
+      locationCity,
+      locationAddress,
+      contactName,
+      contactPhone,
+    };
+
+    await AsyncStorage.setItem("turax_manager_profile", JSON.stringify(managerProfile));
+    setScreen("employer");
+  };
+
+  const publishAvailability = () => {
+    const newPost = {
+      id: Date.now().toString(),
+      type: 'waiter',
+      name: fullName || authName || 'Ospătar',
+      dates: selectedDates,
+      availability: dayAvailability,
+      createdAt: new Date().toISOString(),
+    };
+    setPosts(prev => [newPost, ...prev]);
+    setScreen("feed");
+  };
+
+  if (screen === 'feed') {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ScrollView contentContainerStyle={styles.formPage}>
+          <Text style={styles.pageTitle}>Feed TuraX</Text>
+          {posts.length === 0 ? (
+            <Text>Nu există postări încă.</Text>
+          ) : (
+            posts.map(post => (
+              <View key={post.id} style={{marginBottom:16,padding:16,borderWidth:1,borderColor:'#D1D5DB',borderRadius:12}}>
+                <Text style={{fontWeight:'700',fontSize:18}}>{post.name}</Text>
+                <Text>Disponibilitate ospătar</Text>
+              </View>
+            ))
+          )}
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
+
+  if (screen === 'availability') {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ScrollView contentContainerStyle={styles.formPage}>
+          <TouchableOpacity onPress={() => setScreen('waiter')}>
+            <Text style={styles.back}>← Înapoi</Text>
+          </TouchableOpacity>
+
+          <Text style={styles.pageTitle}>Publică disponibilitatea</Text>
+
+          <Text style={{fontSize:16,color:"#6B7280",marginBottom:20}}>
+            Spune când poți lucra și ce tarif dorești pentru această postare.
+          </Text>
+          <Text style={{fontSize:16,fontWeight:"700",marginBottom:10}}>
+            Alege data sau datele
+          </Text>
+
+          <View style={{marginBottom:20,borderRadius:16,overflow:"hidden"}}>
+            <Calendar
+              minDate={new Date().toISOString().slice(0,10)}
+              firstDay={1}
+              onDayPress={(day) =>
+                setSelectedDates(prev =>
+                  prev.includes(day.dateString)
+                    ? prev.filter(x => x !== day.dateString)
+                    : [...prev, day.dateString]
+                )
+              }
+              markedDates={Object.fromEntries(
+                selectedDates.map(date => [
+                  date,
+                  {selected:true,selectedColor:"#111827"}
+                ])
+              )}
+            />
+          </View>
+
+
+          {selectedDates.length > 0 && (
+            <View style={{marginBottom:20}}>
+              <Text style={{fontSize:16,fontWeight:"700",marginBottom:10}}>
+                Interval orar
+              </Text>
+
+              {[...selectedDates].sort().map(date => {
+                const info = dayAvailability[date] || {};
+
+                return (
+                  <View
+                    key={date}
+                    style={{
+                      marginBottom:14,
+                      padding:14,
+                      borderWidth:1,
+                      borderColor:"#D1D5DB",
+                      borderRadius:16,
+                      backgroundColor:"#FFFFFF"
+                    }}
+                  >
+                    <Text style={{fontSize:16,fontWeight:"700",marginBottom:10}}>
+                      {new Date(date+"T12:00:00").toLocaleDateString("ro-RO",{
+                        weekday:"long",
+                        day:"numeric",
+                        month:"long"
+                      })}
+                    </Text>
+              <Text style={{fontWeight:"600",marginBottom:6}}>Tarif dorit (lei)</Text>
+          <TextInput placeholder="Tarif dorit (lei)" keyboardType="numeric" value={info.rate || ""} onChangeText={(value) => setDayAvailability(prev => ({...prev, [date]: {...(prev[date] || {}), rate: value}}))} style={styles.input} />
+
+                    <View style={{flexDirection:"row",gap:10}}>
+                      <View style={{flex:1,borderWidth:1,borderColor:"#D1D5DB",borderRadius:12,overflow:"hidden"}}>
+                        <Picker
+                          selectedValue={info.start || ""}
+                          onValueChange={(value) =>
+                            setDayAvailability(prev => ({
+                              ...prev,
+                              [date]: {...(prev[date] || {}), start:value}
+                            }))
+                          }
+                        >
+                          <Picker.Item label="De la" value="" />
+                          {Array.from({length:24},(_,h)=>{
+                            const ora=String(h).padStart(2,"0")+":00";
+                            return <Picker.Item key={ora} label={ora} value={ora} />;
+                          })}
+                        </Picker>
+                      </View>
+
+                      <View style={{flex:1,borderWidth:1,borderColor:"#D1D5DB",borderRadius:12,overflow:"hidden"}}>
+                        <Picker
+                          selectedValue={info.end || ""}
+                          onValueChange={(value) =>
+                            setDayAvailability(prev => ({
+                              ...prev,
+                              [date]: {...(prev[date] || {}), end:value}
+                            }))
+                          }
+                        >
+                          <Picker.Item label="Până la" value="" />
+                          {Array.from({length:24},(_,h)=>{
+                            const ora=String(h).padStart(2,"0")+":00";
+                            return <Picker.Item key={ora} label={ora} value={ora} />;
+                          })}
+                        </Picker>
+                      </View>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          )}
+
+          <TouchableOpacity onPress={publishAvailability} style={styles.primaryButton}>
+            <Text style={styles.primaryButtonText}>
+              Publică disponibilitatea
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
   if (screen === 'waiter') {
     return (
       <SafeAreaView style={styles.container}>
@@ -40,17 +295,23 @@ export default function App() {
 
           <TextInput
             placeholder="Nume complet"
+        value={fullName}
+        onChangeText={setFullName}
             placeholderTextColor= "#8A8F98"
             style={styles.input}
           />
 <TextInput
             placeholder="Oraș"
+        value={city}
+        onChangeText={setCity}
             placeholderTextColor="#8A8F98"
             style={styles.input}
           />
 
           <TextInput
             placeholder="Ani de experiență"
+        value={experience}
+        onChangeText={setExperience}
         placeholderTextColor="#9CA3AF"
             keyboardType="numeric"
             style={styles.input}
@@ -74,145 +335,27 @@ export default function App() {
         ))}
       </View>
 
-          <Text style={{fontSize:16,fontWeight:"600",marginBottom:8,color:"#6B7280"}}>Zile disponibile</Text>
-      <Text style={{fontSize:13,color:"#9CA3AF",marginBottom:10}}>Selectează zilele în care poți accepta ture</Text>
-      <View style={{flexDirection:"row",flexWrap:"wrap",gap:8,marginBottom:16}}>
-        {["Lun","Mar","Mie","Joi","Vin","Sâm","Dum"].map((day)=>(
-          <TouchableOpacity
-            key={day}
-            onPress={()=>setAvailableDays(prev=>prev.includes(day)?prev.filter(x=>x!==day):[...prev,day])}
-            style={{
-              paddingVertical:10,
-              paddingHorizontal:14,
-              borderRadius:20,
-              borderWidth:1,
-              borderColor:availableDays.includes(day)?"#111827":"#D1D5DB",
-              backgroundColor:availableDays.includes(day)?"#111827":"#FFFFFF"
-            }}
-          >
-            <Text style={{fontWeight:"600",color:availableDays.includes(day)?"#FFFFFF":"#111827"}}>{day}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {availableDays.length > 0 && (
-        <View style={{marginBottom:16}}>
-          {availableDays.map((day) => {
-            const info = dayAvailability[day] || {mode:"all",start:"",end:""};
-            const setMode = (mode) => setDayAvailability(prev => ({
-              ...prev,
-              [day]: {...(prev[day] || {}), mode}
-            }));
-            return (
-              <View key={day} style={{borderWidth:1,borderColor:"#E5E7EB",borderRadius:14,padding:12,marginBottom:10}}>
-                <Text style={{fontSize:15,fontWeight:"700",marginBottom:10}}>{day}</Text>
-
-                <View style={{flexDirection:"row",flexWrap:"wrap",gap:8}}>
-                  {[
-                    ["all","Toată ziua"],
-                    ["first","09⁰⁰–16⁰⁰"],
-                    ["second","17⁰⁰–00⁰⁰"],
-                    ["custom","Personalizat"]
-                  ].map(([mode,label]) => (
-                    <TouchableOpacity
-                      key={mode}
-                      onPress={()=>setMode(mode)}
-                      style={{
-                        paddingVertical:9,
-                        paddingHorizontal:12,
-                        borderRadius:18,
-                        borderWidth:1,
-                        borderColor:info.mode===mode?"#111827":"#D1D5DB",
-                        backgroundColor:info.mode===mode?"#111827":"#FFFFFF"
-                      }}
-                    >
-                      <Text style={{fontWeight:"600",color:info.mode===mode?"#FFFFFF":"#111827"}}>{label}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-
-                {info.mode==="custom" && (
-                  <View style={{flexDirection:"row",gap:8,marginTop:10}}>
-                    <View style={{flex:1,borderWidth:1,borderColor:"#D1D5DB",borderRadius:12,overflow:"hidden",backgroundColor:"#FFFFFF"}}>
-<Picker
-  selectedValue={info.start || ""}
-  onValueChange={(value)=>setDayAvailability(prev=>({...prev,[day]:{...(prev[day]||{}),mode:"custom",start:value}}))}
-  style={{height:50,color:"#111827"}}
->
-  <Picker.Item label="De la" value="" />
-  {Array.from({length:16},(_,i)=>i+8).map(h=>{
-    const ora=String(h).padStart(2,"0")+":00";
-    return <Picker.Item key={ora} label={ora.replace(":00","⁰⁰")} value={ora} />;
-  })}
-</Picker>
-</View>
-                    <View style={{flex:1,borderWidth:1,borderColor:"#D1D5DB",borderRadius:12,overflow:"hidden",backgroundColor:"#FFFFFF"}}>
-<Picker
-  selectedValue={info.end || ""}
-  onValueChange={(value)=>setDayAvailability(prev=>({...prev,[day]:{...(prev[day]||{}),mode:"custom",end:value}}))}
-  style={{height:50,color:"#111827"}}
->
-  <Picker.Item label="Până la" value="" />
-  {(info.start
-    ? Array.from({length:16},(_,i)=>(parseInt(info.start,10)+i+1)%24)
-    : Array.from({length:17},(_,i)=>(i+8)%24)
-  ).map(hour=>{
-    const ora=String(hour).padStart(2,"0")+":00";
-    return <Picker.Item key={ora+"end"} label={ora.replace(":00","⁰⁰")} value={ora} />;
-  })}
-</Picker>
-</View>
-                  </View>
-                )}
-              </View>
-            );
-          })}
-        </View>
-      )}
-
-      <Text style={{fontSize:16,fontWeight:"600",marginBottom:8,color:"#6B7280"}}>Interval tarifar dorit</Text>
-      {negotiable ? (
-        <View style={{flexDirection:"row",gap:10,marginBottom:12}}>
           <TextInput
-            placeholder="De la (lei/tură)"
-            placeholderTextColor="#9CA3AF"
-            keyboardType="numeric"
-            style={[styles.input,{flex:1,marginBottom:0}]}
-          />
-          <TextInput
-            placeholder="Până la (lei/tură)"
-            placeholderTextColor="#9CA3AF"
-            keyboardType="numeric"
-            style={[styles.input,{flex:1,marginBottom:0}]}
-          />
-        </View>
-      ) : (
-        <TextInput
-          placeholder="Tarif dorit (lei/tură)"
-          placeholderTextColor="#9CA3AF"
-          keyboardType="numeric"
-          style={styles.input}
-        />
-      )}
-      <View style={{flexDirection:"row",gap:10,marginBottom:16}}>
-        <TouchableOpacity onPress={()=>setNegotiable(true)} style={{flex:1,padding:14,borderRadius:12,borderWidth:1,borderColor:negotiable?"#111827":"#D1D5DB",alignItems:"center",backgroundColor:negotiable?"#111827":"#FFFFFF"}}>
-          <Text style={{fontWeight:"600",color:negotiable?"#FFFFFF":"#111827"}}>Negociabil</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={()=>setNegotiable(false)} style={{flex:1,padding:14,borderRadius:12,borderWidth:1,borderColor:!negotiable?"#111827":"#D1D5DB",alignItems:"center",backgroundColor:!negotiable?"#111827":"#FFFFFF"}}>
-          <Text style={{fontWeight:"600",color:!negotiable?"#FFFFFF":"#111827"}}>Tarif fix</Text>
-        </TouchableOpacity>
-      </View>
-
-      <TextInput
             placeholder="Descriere scurtă despre tine"
+        value={description}
+        onChangeText={setDescription}
         placeholderTextColor="#9CA3AF"
             multiline
             style={[styles.input, styles.textArea]}
           />
 
-          <TouchableOpacity style={styles.primaryButton}>
+          <TouchableOpacity onPress={saveProfile} style={styles.primaryButton}>
             <Text style={styles.primaryButtonText}>
               Salvează profilul
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => setScreen('availability')}
+            style={[styles.primaryButton,{marginTop:12}]}
+          >
+            <Text style={styles.primaryButtonText}>
+              Publică disponibilitatea
             </Text>
           </TouchableOpacity>
 
@@ -222,6 +365,64 @@ export default function App() {
   }
 
   // ECRAN RESTAURANT / ANGAJATOR
+  // PROFIL MANAGER / LOCATIE
+  if (screen === "managerProfile") {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ScrollView contentContainerStyle={styles.formPage}>
+          <Text style={styles.pageTitle}>Profil locație</Text>
+          <Text style={styles.pageSubtitle}>Completează datele locației tale</Text>
+
+          <TextInput
+            placeholder="Numele locației"
+            value={locationName}
+            onChangeText={setLocationName}
+            style={styles.input}
+          />
+
+          <TextInput
+            placeholder="Tip locație (Restaurant, Bar, Hotel...)"
+            value={locationType}
+            onChangeText={setLocationType}
+            style={styles.input}
+          />
+          <TextInput
+            placeholder="Oraș"
+            value={locationCity}
+            onChangeText={setLocationCity}
+            style={styles.input}
+          />
+
+          <TextInput
+            placeholder="Adresă / Zonă"
+            value={locationAddress}
+            onChangeText={setLocationAddress}
+            style={styles.input}
+          />
+
+          <TextInput
+            placeholder="Persoană de contact"
+            value={contactName}
+            onChangeText={setContactName}
+            style={styles.input}
+          />
+
+          <TextInput
+            placeholder="Telefon"
+            value={contactPhone}
+            onChangeText={setContactPhone}
+            keyboardType="phone-pad"
+            style={styles.input}
+          />
+        <TouchableOpacity onPress={saveManagerProfile} style={[styles.primaryButton,{marginTop:16}]}>
+          <Text style={styles.primaryButtonText}>Salvează profilul</Text>
+        </TouchableOpacity>
+
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
   if (screen === 'employer') {
     return (
       <SafeAreaView style={styles.container}>
@@ -282,13 +483,109 @@ export default function App() {
             style={[styles.input, styles.textArea]}
           />
 
-          <TouchableOpacity style={styles.primaryButton}>
+          <TouchableOpacity onPress={publishAvailability} style={styles.primaryButton}>
             <Text style={styles.primaryButtonText}>
               Publică tura
             </Text>
           </TouchableOpacity>
 
         </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
+  if (authLoading) {
+    return (
+      <SafeAreaView style={{flex:1,justifyContent:'center',alignItems:'center'}}>
+        <Text>Se încarcă TuraX...</Text>
+      </SafeAreaView>
+    );
+  }
+
+  if (!session) {
+    return (
+      <SafeAreaView style={{flex:1,backgroundColor:'#F7F8FA'}}>
+        <ScrollView contentContainerStyle={{padding:24,paddingTop:60}}>
+          <Text style={{fontSize:34,fontWeight:'800',marginBottom:8}}>TuraX</Text>
+          <Text style={{fontSize:18,marginBottom:24}}>
+            {authMode === 'login' ? 'Autentificare' : 'Creează cont'}
+          </Text>
+{authMode === 'signup' && (
+  <>
+    <Text style={{fontWeight:'600',marginBottom:6}}>Nume complet</Text>
+    <TextInput
+      value={authName}
+      onChangeText={setAuthName}
+      placeholder="Nume și prenume"
+      style={styles.input}
+    />
+
+  </>
+)}
+
+<Text style={{fontWeight:'600',marginTop:18,marginBottom:6}}>Email</Text>
+<TextInput
+  value={authEmail}
+  onChangeText={setAuthEmail}
+  placeholder="email@exemplu.ro"
+  autoCapitalize="none"
+  keyboardType="email-address"
+  style={styles.input}
+/>
+
+<Text style={{fontWeight:'600',marginTop:14,marginBottom:6}}>Parolă</Text>
+<TextInput
+  value={authPassword}
+  onChangeText={setAuthPassword}
+  placeholder="Parola"
+  secureTextEntry
+  style={styles.input}
+/>
+
+{!!authMessage && (
+  <Text style={{marginTop:14}}>{authMessage}</Text>
+)}
+
+<TouchableOpacity
+  onPress={authMode==='login' ? handleLogin : handleSignUp}
+  style={[styles.primaryButton,{marginTop:22}]}
+>
+  <Text style={styles.primaryButtonText}>
+    {authMode==='login' ? 'Intră în cont' : 'Creează cont'}
+  </Text>
+</TouchableOpacity>
+
+<TouchableOpacity
+  onPress={() => {
+    setAuthMessage('');
+    setAuthMode(authMode==='login' ? 'signup' : 'login');
+  }}
+  style={{marginTop:22}}
+>
+  <Text style={{textAlign:'center',fontWeight:'600'}}>
+    {authMode==='login'
+      ? 'Nu ai cont? Creează unul'
+      : 'Ai deja cont? Autentifică-te'}
+  </Text>
+</TouchableOpacity>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
+  if (session && authRole === null) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={{flex:1,justifyContent:"center",padding:24}}>
+          <Text style={{fontSize:30,fontWeight:"800",marginBottom:10}}>Alege rolul</Text>
+          <Text style={{fontSize:17,marginBottom:28}}>Cum vei folosi TuraX?</Text>
+          <TouchableOpacity onPress={() => { setAuthRole("waiter"); setScreen("waiter"); }} style={styles.primaryButton}>
+            <Text style={styles.primaryButtonText}>Sunt ospătar</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => { setAuthRole("manager"); setScreen("managerProfile"); }} style={[styles.primaryButton,{marginTop:14}]}>
+            <Text style={styles.primaryButtonText}>Sunt manager</Text>
+          </TouchableOpacity>
+        </View>
       </SafeAreaView>
     );
   }
