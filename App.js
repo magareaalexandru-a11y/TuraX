@@ -622,7 +622,7 @@ const goToRole = (role) => {
 
         <TouchableOpacity
           style={styles.waiterButton}
-          onPress={() => setScreen('waiter')}
+          onPress={() => goToRole('waiter')}
         >
           <Text style={styles.icon}>👨‍🍳</Text>
 
@@ -639,7 +639,7 @@ const goToRole = (role) => {
 
         <TouchableOpacity
           style={styles.restaurantButton}
-          onPress={() => setScreen('employer')}
+          onPress={() => goToRole('manager')}
         >
           <Text style={styles.icon}>🏨</Text>
 
