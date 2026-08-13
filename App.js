@@ -2,7 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Picker } from "@react-native-picker/picker";
 import 'react-native-url-polyfill/auto'
 import { Calendar } from "react-native-calendars";
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   StyleSheet,
   Text,
@@ -74,6 +74,14 @@ export default function App() {
     return () => listener.subscription.unsubscribe();
   }, []);
   const [screen, setScreen] = useState('home');
+  const welcomeScrollRef = useRef(null);
+const [selectedRole, setSelectedRole] = useState(null);
+
+const goToRole = (role) => {
+  setSelectedRole(role);
+  setAuthRole(role);
+  setScreen('auth');
+};
   const [negotiable, setNegotiable] = useState(true);
   const [workTypes, setWorkTypes] = useState([]);
   const [locationName, setLocationName] = useState("");
