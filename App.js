@@ -703,35 +703,37 @@ const styles = StyleSheet.create({
   welcome: {
     fontSize: 28,
     fontWeight: '800',
-    color: '#111827',
+    color: '#D4AF37',
     textAlign: 'center',
     marginBottom: 10,
   },
 
   question: {
     fontSize: 18,
-    color: '#4B5563',
+    color: '#D1D5DB',
     textAlign: 'center',
     marginBottom: 30,
   },
 
   waiterButton: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#111827',
     padding: 20,
     borderRadius: 18,
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: '#D4AF37',
   },
 
   restaurantButton: {
-    backgroundColor: '#111827',
+    backgroundColor: '#D4AF37',
     padding: 20,
     borderRadius: 18,
     flexDirection: 'row',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#D4AF37',
   },
 
   icon: {
@@ -746,32 +748,32 @@ const styles = StyleSheet.create({
   buttonTitleDark: {
     fontSize: 19,
     fontWeight: '800',
-    color: '#111827',
+    color: '#07111F',
     marginBottom: 5,
   },
 
   buttonTextDark: {
     fontSize: 14,
-    color: '#6B7280',
+    color: '#374151',
     lineHeight: 20,
   },
 
   buttonTitleLight: {
     fontSize: 19,
     fontWeight: '800',
-    color: '#FFFFFF',
+    color: '#07111F',
     marginBottom: 5,
   },
 
   buttonTextLight: {
     fontSize: 14,
-    color: '#D1D5DB',
+    color: '#374151',
     lineHeight: 20,
   },
 
   info: {
     textAlign: 'center',
-    color: '#6B7280',
+    color: '#9CA3AF',
     fontSize: 14,
     lineHeight: 21,
     marginTop: 30,
