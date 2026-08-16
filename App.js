@@ -127,6 +127,7 @@ import ShiftsScreen from "./src/screens/shifts/ShiftsScreen";
 import ProfileScreen from "./src/screens/profile/ProfileScreen";
 
 import { useAuthActions } from "./src/hooks/useAuthActions";
+import { useCoreRealtimeSync } from "./src/hooks/useCoreRealtimeSync";
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || "https://hfqijvzfjmuysuwdoxej.supabase.co";
 const SUPABASE_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || "sb_publishable_KJkUOxPP0_8JFtbTzWN0oA_qGA_gtcm";
 
@@ -453,36 +454,13 @@ export default function App() {
     refreshCoreData();
   }, [currentUserId, role, profileComplete]);
 
-  useEffect(() => {
-    if (!currentUserId || !role || !profileComplete) return;
-
-    let timer = null;
-    const scheduleRefresh = () => {
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(() => refreshCoreData(true), 220);
-    };
-
-    let channel = supabase
-      .channel(`turax-core:${currentUserId}:${role}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "shifts" }, scheduleRefresh)
-      .on("postgres_changes", { event: "*", schema: "public", table: "applications" }, scheduleRefresh)
-      .on("postgres_changes", { event: "*", schema: "public", table: "conversations" }, scheduleRefresh)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "notifications", filter: `user_id=eq.${currentUserId}` },
-        scheduleRefresh
-      );
-
-    if (role === "manager") {
-      channel = channel.on("postgres_changes", { event: "*", schema: "public", table: "availability" }, scheduleRefresh);
-    }
-
-    channel.subscribe();
-    return () => {
-      if (timer) clearTimeout(timer);
-      supabase.removeChannel(channel);
-    };
-  }, [currentUserId, role, profileComplete]);
+  useCoreRealtimeSync({
+    supabase,
+    currentUserId,
+    role,
+    profileComplete,
+    refreshCoreData: (...args) => refreshCoreData(...args),
+  });
 
   useEffect(() => {
     setShiftFilter("Toate");
