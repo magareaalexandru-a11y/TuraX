@@ -130,6 +130,7 @@ import { useAuthActions } from "./src/hooks/useAuthActions";
 import { useCoreRealtimeSync } from "./src/hooks/useCoreRealtimeSync";
 import { useChatRealtime } from "./src/hooks/useChatRealtime";
 import { profileToForms } from "./src/utils/profileFormUtils";
+import { buildWaiterProfileSave, buildManagerProfileSave } from "./src/utils/profileSaveUtils";
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || "https://hfqijvzfjmuysuwdoxej.supabase.co";
 const SUPABASE_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || "sb_publishable_KJkUOxPP0_8JFtbTzWN0oA_qGA_gtcm";
 
@@ -595,64 +596,10 @@ export default function App() {
   const saveWaiterProfile = async () => {
     setFormError("");
 
-    const exp = Number(waiterForm.experience);
+    const { error: validationError, payload } =
+      buildWaiterProfileSave(waiterForm, currentUserId);
 
-    if (waiterForm.fullName.trim().length < 2)
-      return setFormError("Completează numele complet.");
-
-    if (waiterForm.city.trim().length < 2)
-      return setFormError("Completează orașul.");
-
-    if (!Number.isFinite(exp) || exp < 0 || exp > 60)
-      return setFormError("Introdu corect anii de experiență.");
-
-    const customRole = waiterForm.customRoleEnabled
-      ? String(waiterForm.customWorkerRole || "").trim()
-      : "";
-
-    if (waiterForm.customRoleEnabled && customRole.length < 2)
-      return setFormError("Specifică rolul HoReCa.");
-
-    if (customRole.length > 60)
-      return setFormError("Rolul poate avea maximum 60 de caractere.");
-
-    const workerRoles = [
-      ...(waiterForm.workerRoles || []),
-      ...(customRole ? [customRole] : []),
-    ]
-      .map((x) => String(x).trim())
-      .filter(Boolean);
-
-    const uniqueRoles = workerRoles.filter(
-      (x, i, arr) =>
-        arr.findIndex(
-          (y) =>
-            y.toLocaleLowerCase("ro-RO") ===
-            x.toLocaleLowerCase("ro-RO")
-        ) === i
-    );
-
-    if (uniqueRoles.length === 0)
-      return setFormError("Selectează cel puțin un rol profesional.");
-
-    if (waiterForm.workTypes.length === 0)
-      return setFormError("Selectează cel puțin un tip de experiență.");
-
-    if (waiterForm.horecaSkills.length === 0)
-      return setFormError("Selectează cel puțin o competență HoReCa.");
-
-    const payload = {
-      id: currentUserId,
-      role: "waiter",
-      full_name: waiterForm.fullName.trim(),
-      city: waiterForm.city.trim(),
-      experience: exp,
-      description: waiterForm.description.trim() || null,
-      worker_roles: uniqueRoles,
-      work_types: waiterForm.workTypes,
-      horeca_skills: waiterForm.horecaSkills,
-      updated_at: new Date().toISOString(),
-    };
+    if (validationError) return setFormError(validationError);
 
     const { data, error } = await supabase
       .from("profiles")
@@ -676,24 +623,11 @@ export default function App() {
 
   const saveManagerProfile = async () => {
     setFormError("");
-    if (managerForm.locationName.trim().length < 2) return setFormError("Completează numele locației.");
-    if (managerForm.locationType.trim().length < 2) return setFormError("Completează tipul locației.");
-    if (managerForm.locationCity.trim().length < 2) return setFormError("Completează orașul.");
-    if (managerForm.locationAddress.trim().length < 3) return setFormError("Completează adresa sau zona.");
-    if (managerForm.contactName.trim().length < 2) return setFormError("Completează persoana de contact.");
-    if (cleanPhone(managerForm.contactPhone).length < 7) return setFormError("Introdu un număr de telefon valid.");
 
-    const payload = {
-      id: currentUserId,
-      role: "manager",
-      location_name: managerForm.locationName.trim(),
-      location_type: managerForm.locationType.trim(),
-      location_city: managerForm.locationCity.trim(),
-      location_address: managerForm.locationAddress.trim(),
-      contact_name: managerForm.contactName.trim(),
-      contact_phone: cleanPhone(managerForm.contactPhone),
-      updated_at: new Date().toISOString(),
-    };
+    const { error: validationError, payload } =
+      buildManagerProfileSave(managerForm, currentUserId);
+
+    if (validationError) return setFormError(validationError);
 
     const { data, error } = await supabase
       .from("profiles")
@@ -702,7 +636,12 @@ export default function App() {
       .single();
 
     if (error) return setFormError(error.message);
-    await AsyncStorage.setItem("turax_manager_profile", JSON.stringify(payload));
+
+    await AsyncStorage.setItem(
+      "turax_manager_profile",
+      JSON.stringify(payload)
+    );
+
     setProfile(data);
     setRole("manager");
     showNotice("Profilul a fost actualizat.");
