@@ -131,6 +131,7 @@ import { useCoreRealtimeSync } from "./src/hooks/useCoreRealtimeSync";
 import { useChatRealtime } from "./src/hooks/useChatRealtime";
 import { profileToForms } from "./src/utils/profileFormUtils";
 import { buildWaiterProfileSave, buildManagerProfileSave } from "./src/utils/profileSaveUtils";
+import { filterShifts } from "./src/utils/shiftFilterUtils";
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || "https://hfqijvzfjmuysuwdoxej.supabase.co";
 const SUPABASE_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || "sb_publishable_KJkUOxPP0_8JFtbTzWN0oA_qGA_gtcm";
 
@@ -1334,49 +1335,18 @@ export default function App() {
     });
   };
 
-  const filteredShifts = useMemo(() => {
-    let list = [...shifts];
-    const q = shiftQuery.trim().toLowerCase();
-    if (q) {
-      list = list.filter((s) =>
-        [s.location_name, s.city, s.role, s.description]
-          .filter(Boolean)
-          .some((v) => String(v).toLowerCase().includes(q))
-      );
-    }
-    if (role === "manager") {
-      if (shiftFilter === "Active") list = list.filter((s) => ["open", "closed"].includes(s.status) && !hasShiftEnded(s));
-      if (shiftFilter === "Ocupate") list = list.filter((s) => s.status === "closed");
-      if (shiftFilter === "Finalizate") list = list.filter((s) => s.status === "completed");
-      if (shiftFilter === "Anulate") list = list.filter((s) => s.status === "cancelled");
-      return list;
-    }
-
-    const myWorkerRoles = Array.isArray(profile?.worker_roles)
-      ? profile.worker_roles
-      : [];
-
-    if (myWorkerRoles.length > 0) {
-      list = list.filter((shift) =>
-        myWorkerRoles.some(
-          (workerRole) =>
-            String(workerRole || "").trim().toLocaleLowerCase("ro-RO") ===
-            String(shift.role || "").trim().toLocaleLowerCase("ro-RO")
-        )
-      );
-    }
-
-    if (shiftFilter === "Azi") list = list.filter((s) => s.shift_date === todayIso());
-    if (shiftFilter === "Mâine") list = list.filter((s) => s.shift_date === addDaysIso(1));
-    if (shiftFilter === "Weekend") {
-      list = list.filter((s) => {
-        const d = new Date(`${s.shift_date}T12:00:00`).getDay();
-        return d === 0 || d === 6;
-      });
-    }
-    if (shiftFilter === "Favorite") list = list.filter((s) => favorites.includes(s.id));
-    return list;
-  }, [shifts, shiftQuery, shiftFilter, favorites, role, profile]);
+  const filteredShifts = useMemo(
+    () =>
+      filterShifts({
+        shifts,
+        shiftQuery,
+        shiftFilter,
+        favorites,
+        role,
+        profile,
+      }),
+    [shifts, shiftQuery, shiftFilter, favorites, role, profile]
+  );
 
   const unreadCount = notifications.filter((n) => !n.read_at).length;
 
