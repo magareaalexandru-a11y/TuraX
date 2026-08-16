@@ -86,3 +86,12 @@ export function money(value) {
   const n = Number(value || 0);
   return Number.isFinite(n) ? `${n.toFixed(0)} lei` : "";
 }
+
+
+export function shiftStatusLabel(status) {
+  if (status === "open") return "Deschisă";
+  if (status === "closed") return "Locuri ocupate";
+  if (status === "cancelled") return "Anulată";
+  if (status === "completed") return "Finalizată";
+  return status || "—";
+}
