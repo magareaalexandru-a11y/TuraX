@@ -1,828 +1,4250 @@
+// TURAX_START_FROM_0700
+// TURAX_HOTFIX_PUBLIC_PROFILE_3_1_3_1
+// TURAX_UPGRADE_3_1_3
+// TURAX_HOTFIX_CUSTOM_ROLE_3_1_2_2
+// TURAX_UPGRADE_3_1_2
+// Upgrade 3.1.2: UX publicare, navigare si catalog profesionisti
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as ImagePicker from "expo-image-picker";
+import { decode } from "base64-arraybuffer";
 import { Picker } from "@react-native-picker/picker";
-import 'react-native-url-polyfill/auto'
+import "react-native-url-polyfill/auto";
 import { Calendar } from "react-native-calendars";
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from "react";
+import { Ionicons } from "@expo/vector-icons";
 import {
-  StyleSheet,
-  Text,
-  View,
-  TouchableOpacity,
+  ActivityIndicator,
+  Alert,
+  Image,
+  Keyboard,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  RefreshControl,
   SafeAreaView,
-  TextInput,
   ScrollView,
-} from 'react-native';
-import { createClient } from '@supabase/supabase-js';
-const supabaseUrl = 'https://hfqijvzfjmuysuwdoxej.supabase.co';
-const supabaseKey = 'sb_publishable_KJkUOxPP0_8JFtbTzWN0oA_qGA_gtcm';
-const supabase = createClient(supabaseUrl, supabaseKey);
-export default function App() {
-  const [session, setSession] = useState(null);
-  const [authLoading, setAuthLoading] = useState(true);
-  const [authMode, setAuthMode] = useState('login');
-  const [authEmail, setAuthEmail] = useState('');
-  const [authPassword, setAuthPassword] = useState('');
-  const [authName, setAuthName] = useState('');
-  const [authRole, setAuthRole] = useState(null);
-  const [authMessage, setAuthMessage] = useState('');
-  const [posts, setPosts] = useState([]);
+  StatusBar,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { createClient } from "@supabase/supabase-js";
 
-  const handleLogin = async () => {
-    setAuthMessage('');
-    const { error } = await supabase.auth.signInWithPassword({
-      email: authEmail.trim(),
-      password: authPassword,
-    });
-    if (error) setAuthMessage(error.message);
-  };
-  const handleSignUp = async () => { setAuthMessage("Se creează..."); const { error } = await supabase.auth.signUp({ email: authEmail.trim(), password: authPassword }); if (error) setAuthMessage(error.message); else setAuthMessage("Cont creat!"); };
+const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || "https://hfqijvzfjmuysuwdoxej.supabase.co";
+const SUPABASE_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || "sb_publishable_KJkUOxPP0_8JFtbTzWN0oA_qGA_gtcm";
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
+  auth: {
+    storage: AsyncStorage,
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: false,
+  },
+});
+
+const C = {
+  bg: "#020B16",
+  panel: "#0B1524",
+  panel2: "#111B2B",
+  panel3: "#172338",
+  border: "#2B394F",
+  gold: "#F5B942",
+  gold2: "#E6AE50",
+  text: "#FFFFFF",
+  muted: "#98A2B3",
+  muted2: "#707B8E",
+  danger: "#EF5350",
+  success: "#56C271",
+  warning: "#F5B942",
+};
+
+const WORK_TYPES = [
+  "Restaurant",
+  "Bar / Pub",
+  "Cafenea",
+  "Hotel",
+  "Evenimente",
+];
+
+const SKILLS = [
+  "Servire à la carte",
+  "POS / Casă de marcat",
+  "Servire băuturi",
+  "Preparare băuturi / Bar",
+  "Gestionare mese",
+  "Evenimente",
+  "Lucru în echipă",
+];
+
+const SHIFT_ROLES = [
+  "Ospătar",
+  "Barman",
+  "Bucătar",
+  "Ajutor bucătar",
+  "Runner",
+  "Recepționer",
+  "Altele",
+];
+
+const WORKER_ROLES = SHIFT_ROLES.filter((x) => x !== "Altele");
+
+const TIME_SLOTS = Array.from({ length: 48 }, (_, index) => {
+  const minutes = index * 30;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+});
+
+const localIsoDate = (date = new Date()) => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+};
+const todayIso = () => localIsoDate(new Date());
+const MIN_PUBLISH_LEAD_MS = 60 * 60 * 1000;
+const isPublishStartAllowed = (date, time) => {
+  if (!date || !time) return false;
+  const start = new Date(`${date}T${String(time).slice(0, 5)}:00`);
+  return Number.isFinite(start.getTime()) && start.getTime() >= Date.now() + MIN_PUBLISH_LEAD_MS;
+};
+const formatHorecaText = (value) => String(value || "")
+  .replace(/(\d+)\s*pers\b/gi, "$1 persoane")
+  .replace(/^Eveniment\s+(\d+\s+persoane)$/i, "Eveniment · $1");
+const addDaysIso = (n) => {
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  return localIsoDate(d);
+};
+const shiftStartDate = (shift) => {
+  if (!shift) return null;
+  if (shift.starts_at) return new Date(shift.starts_at);
+  if (shift.shift_date && shift.start_time) {
+    return new Date(`${shift.shift_date}T${String(shift.start_time).slice(0, 5)}:00`);
+  }
+  return null;
+};
+const canCancelConfirmedShift = (shift) => {
+  const start = shiftStartDate(shift);
+  return !!start && start.getTime() - Date.now() > 48 * 60 * 60 * 1000;
+};
+const shiftEndDate = (shift) => {
+  if (!shift) return null;
+  if (shift.ends_at) return new Date(shift.ends_at);
+  if (shift.shift_date && shift.start_time && shift.end_time) {
+    const start = new Date(`${shift.shift_date}T${String(shift.start_time).slice(0, 5)}:00`);
+    const end = new Date(`${shift.shift_date}T${String(shift.end_time).slice(0, 5)}:00`);
+    if (end <= start) end.setDate(end.getDate() + 1);
+    return end;
+  }
+  return null;
+};
+const hasShiftEnded = (shift) => {
+  const end = shiftEndDate(shift);
+  return !!end && end.getTime() <= Date.now();
+};
+const isEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+const cleanPhone = (value) => value.replace(/[^\d+]/g, "");
+const sameDay = (a, b) => {
+  const da = new Date(a);
+  const db = new Date(b);
+  return da.getFullYear() === db.getFullYear() && da.getMonth() === db.getMonth() && da.getDate() === db.getDate();
+};
+const messageDayLabel = (value) => {
+  if (!value) return "";
+  const d = new Date(value);
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+  if (sameDay(d, today)) return "Astăzi";
+  if (sameDay(d, yesterday)) return "Ieri";
+  return d.toLocaleDateString("ro-RO", { day: "numeric", month: "short", year: d.getFullYear() === today.getFullYear() ? undefined : "numeric" });
+};
+const messageTime = (value) => value ? new Date(value).toLocaleTimeString("ro-RO", { hour: "2-digit", minute: "2-digit" }) : "";
+const conversationTime = (value) => {
+  if (!value) return "";
+  const d = new Date(value);
+  const today = new Date();
+  if (sameDay(d, today)) return messageTime(value);
+  return d.toLocaleDateString("ro-RO", { day: "numeric", month: "short" });
+};
+
+function formatDateRo(value) {
+  if (!value) return "";
+  const d = new Date(`${value}T12:00:00`);
+  return d.toLocaleDateString("ro-RO", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
+}
+
+function money(value) {
+  const n = Number(value || 0);
+  return Number.isFinite(n) ? `${n.toFixed(0)} lei` : "";
+}
+
+function Shell({ children }) {
+  const androidTop = Platform.OS === "android" ? StatusBar.currentHeight || 0 : 0;
+  return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: C.bg, paddingTop: androidTop }}>
+      <StatusBar barStyle="light-content" backgroundColor={C.bg} translucent={false} />
+      {children}
+    </SafeAreaView>
+  );
+}
+
+function ScreenScroll({ children, refreshControl, bottom = 120 }) {
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
 
   useEffect(() => {
-    const loadRole = async (currentSession) => {
-      if (!currentSession?.user?.id) {
-        setAuthRole(null);
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', currentSession.user.id)
-        .single();
-
-      if (error) {
-        console.log('Profile role error:', error.message);
-        setAuthRole(null);
-        return;
-      }
-
-      setAuthRole(data?.role ?? null);
+    const show = Keyboard.addListener("keyboardDidShow", () => setKeyboardVisible(true));
+    const hide = Keyboard.addListener("keyboardDidHide", () => setKeyboardVisible(false));
+    return () => {
+      show.remove();
+      hide.remove();
     };
-
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      loadRole(data.session);
-      setAuthLoading(false);
-    });
-
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => {
-      setSession(newSession);
-      loadRole(newSession);
-      setAuthLoading(false);
-    });
-
-    return () => listener.subscription.unsubscribe();
   }, []);
-  const [screen, setScreen] = useState('home');
-  const [negotiable, setNegotiable] = useState(true);
-  const [workTypes, setWorkTypes] = useState([]);
-  const [locationName, setLocationName] = useState("");
-  const [locationType, setLocationType] = useState("");
-  const [locationCity, setLocationCity] = useState("");
-  const [locationAddress, setLocationAddress] = useState("");
-  const [contactName, setContactName] = useState("");
-  const [contactPhone, setContactPhone] = useState("");
-  const [horecaSkills, setHorecaSkills] = useState([]);
-  const [availableDays, setAvailableDays] = useState([]);
-  const [dayAvailability, setDayAvailability] = useState({});
-  const [tarifMin, setTarifMin] = useState("");
-  const [tarifMax, setTarifMax] = useState("");
-  const [tarifFix, setTarifFix] = useState("");
-  const [fullName, setFullName] = useState("");
-  const [selectedDates, setSelectedDates] = useState([]);
-  const [city, setCity] = useState("");
-  const [experience, setExperience] = useState("");
-  const [description, setDescription] = useState("");
 
-  // ECRAN OSPĂTAR
-  const saveProfile = async () => {
-    const profile = {
-      fullName,
-      city,
-      experience,
-      description,
-      workTypes,
-      horecaSkills,
+  return (
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={0}
+    >
+      <ScrollView
+        style={{ flex: 1 }}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
+        refreshControl={refreshControl}
+        contentContainerStyle={{
+          paddingHorizontal: 20,
+          paddingTop: 16,
+          paddingBottom: bottom + (keyboardVisible ? 280 : 0),
+        }}
+      >
+        {children}
+      </ScrollView>
+    </KeyboardAvoidingView>
+  );
+}
+
+function Title({ children, subtitle }) {
+  return (
+    <View style={{ marginBottom: 22 }}>
+      <Text style={{ color: C.text, fontSize: 30, fontWeight: "900" }}>{children}</Text>
+      {!!subtitle && (
+        <Text style={{ color: C.muted, fontSize: 14, lineHeight: 20, marginTop: 5 }}>
+          {subtitle}
+        </Text>
+      )}
+    </View>
+  );
+}
+
+function BackButton({ onPress }) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.8}
+      style={{
+        width: 48,
+        height: 48,
+        borderRadius: 15,
+        borderWidth: 1,
+        borderColor: C.border,
+        backgroundColor: C.panel,
+        alignItems: "center",
+        justifyContent: "center",
+        marginBottom: 20,
+      }}
+    >
+      <Ionicons name="arrow-back" size={25} color={C.gold} />
+    </TouchableOpacity>
+  );
+}
+
+function Field({
+  label,
+  icon,
+  value,
+  onChangeText,
+  placeholder,
+  keyboardType,
+  secureTextEntry,
+  multiline,
+  right,
+  autoCapitalize = "sentences",
+}) {
+  return (
+    <View style={{ marginBottom: 14 }}>
+      {!!label && (
+        <Text style={{ color: C.gold, fontWeight: "700", fontSize: 13, marginBottom: 7 }}>
+          {label}
+        </Text>
+      )}
+      <View
+        style={{
+          minHeight: multiline ? 122 : 58,
+          borderRadius: 16,
+          borderWidth: 1,
+          borderColor: C.border,
+          backgroundColor: C.panel,
+          flexDirection: "row",
+          alignItems: multiline ? "flex-start" : "center",
+          paddingHorizontal: 15,
+        }}
+      >
+        {!!icon && (
+          <Ionicons
+            name={icon}
+            size={21}
+            color={C.gold}
+            style={{ marginRight: 11, marginTop: multiline ? 17 : 0 }}
+          />
+        )}
+        <TextInput
+          value={value}
+          onChangeText={onChangeText}
+          placeholder={placeholder}
+          placeholderTextColor={C.muted2}
+          keyboardType={keyboardType}
+          secureTextEntry={secureTextEntry}
+          multiline={multiline}
+          textAlignVertical={multiline ? "top" : "center"}
+          autoCapitalize={autoCapitalize}
+          style={{
+            flex: 1,
+            color: C.text,
+            fontSize: 16,
+            minHeight: multiline ? 116 : 56,
+            paddingTop: multiline ? 15 : 0,
+          }}
+        />
+        {right}
+      </View>
+    </View>
+  );
+}
+
+function Button({ label, onPress, icon, secondary, danger, disabled, style }) {
+  const bg = danger ? "transparent" : secondary ? C.panel : C.gold;
+  const fg = danger ? C.danger : secondary ? C.text : "#07111D";
+  const border = danger ? C.danger : secondary ? C.border : C.gold;
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      disabled={disabled}
+      activeOpacity={0.86}
+      style={[
+        {
+          minHeight: 58,
+          borderRadius: 17,
+          borderWidth: 1,
+          borderColor: border,
+          backgroundColor: bg,
+          alignItems: "center",
+          justifyContent: "center",
+          flexDirection: "row",
+          paddingHorizontal: 12,
+          minWidth: 0,
+          opacity: disabled ? 0.5 : 1,
+        },
+        style,
+      ]}
+    >
+      {!!icon && <Ionicons name={icon} size={21} color={fg} style={{ marginRight: 8, flexShrink: 0 }} />}
+      <Text
+        numberOfLines={2}
+        style={{ color: fg, fontSize: 16, fontWeight: "900", flexShrink: 1, textAlign: "center" }}
+      >
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
+function Chip({ label, selected, onPress }) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.8}
+      style={{
+        paddingVertical: 10,
+        paddingHorizontal: 14,
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: selected ? C.gold : C.border,
+        backgroundColor: selected ? C.gold : C.panel,
+        marginRight: 8,
+        marginBottom: 9,
+      }}
+    >
+      <Text style={{ color: selected ? "#07111D" : C.text, fontWeight: "700", fontSize: 14 }}>
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
+function ErrorBox({ text }) {
+  if (!text) return null;
+  return (
+    <View
+      style={{
+        borderWidth: 1,
+        borderColor: "#6D3434",
+        backgroundColor: "#241416",
+        borderRadius: 14,
+        padding: 12,
+        marginBottom: 14,
+      }}
+    >
+      <Text style={{ color: "#FFB8B8", lineHeight: 19 }}>{text}</Text>
+    </View>
+  );
+}
+
+function TuraXNotice({ notice }) {
+  if (!notice) return null;
+  const danger = notice.type === "error";
+  const info = notice.type === "info";
+  return (
+    <View
+      pointerEvents="none"
+      style={{
+        position: "absolute",
+        left: 18,
+        right: 18,
+        top: (Platform.OS === "android" ? StatusBar.currentHeight || 0 : 12) + 10,
+        zIndex: 9999,
+        elevation: 20,
+        backgroundColor: C.panel3,
+        borderWidth: 1,
+        borderColor: danger ? C.danger : info ? C.border : C.gold,
+        borderRadius: 16,
+        paddingHorizontal: 15,
+        paddingVertical: 13,
+        flexDirection: "row",
+        alignItems: "center",
+      }}
+    >
+      <Ionicons
+        name={danger ? "alert-circle-outline" : info ? "information-circle-outline" : "checkmark-circle-outline"}
+        size={22}
+        color={danger ? C.danger : C.gold}
+        style={{ marginRight: 10 }}
+      />
+      <Text style={{ color: C.text, flex: 1, fontWeight: "800", lineHeight: 20 }}>{notice.text}</Text>
+    </View>
+  );
+}
+
+function TuraXConfirm({ dialog, onCancel, onConfirm }) {
+  if (!dialog) return null;
+  return (
+    <Modal transparent visible animationType="fade" onRequestClose={onCancel}>
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: "rgba(0,0,0,0.68)",
+          alignItems: "center",
+          justifyContent: "center",
+          paddingHorizontal: 22,
+        }}
+      >
+        <View
+          style={{
+            width: "100%",
+            maxWidth: 430,
+            borderRadius: 22,
+            borderWidth: 1,
+            borderColor: dialog.danger ? C.danger : C.gold,
+            backgroundColor: C.panel2,
+            padding: 20,
+          }}
+        >
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <View
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: 22,
+                backgroundColor: C.panel3,
+                alignItems: "center",
+                justifyContent: "center",
+                marginRight: 12,
+              }}
+            >
+              <Ionicons
+                name={dialog.danger ? "warning-outline" : "help-circle-outline"}
+                size={24}
+                color={dialog.danger ? C.danger : C.gold}
+              />
+            </View>
+            <Text style={{ color: C.text, fontSize: 20, fontWeight: "900", flex: 1 }}>
+              {dialog.title || "Confirmare"}
+            </Text>
+          </View>
+
+          {!!dialog.message && (
+            <Text style={{ color: C.muted, lineHeight: 21, marginTop: 15 }}>{dialog.message}</Text>
+          )}
+
+          <View style={{ flexDirection: "row", marginTop: 20 }}>
+            <TouchableOpacity
+              onPress={onCancel}
+              style={{
+                flex: 1,
+                minHeight: 50,
+                borderRadius: 14,
+                borderWidth: 1,
+                borderColor: C.border,
+                alignItems: "center",
+                justifyContent: "center",
+                marginRight: 6,
+              }}
+            >
+              <Text style={{ color: C.text, fontWeight: "900" }}>{dialog.cancelLabel || "Renunță"}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={onConfirm}
+              style={{
+                flex: 1,
+                minHeight: 50,
+                borderRadius: 14,
+                backgroundColor: dialog.danger ? C.danger : C.gold,
+                alignItems: "center",
+                justifyContent: "center",
+                marginLeft: 6,
+              }}
+            >
+              <Text style={{ color: dialog.danger ? "#fff" : "#07111D", fontWeight: "900" }}>
+                {dialog.confirmLabel || "Confirmă"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+function RatingStars({ label, onRate, compact = false }) {
+  return (
+    <View style={{ marginTop: compact ? 10 : 14 }}>
+      {!!label && <Text style={{ color: C.muted, fontSize: 13, marginBottom: 7 }}>{label}</Text>}
+      <View style={{ flexDirection: "row", alignItems: "center" }}>
+        {[1, 2, 3, 4, 5].map((rating) => (
+          <TouchableOpacity
+            key={rating}
+            onPress={() => onRate(rating)}
+            activeOpacity={0.72}
+            style={{ paddingVertical: 4, paddingRight: 9 }}
+          >
+            <Ionicons name="star" size={compact ? 25 : 29} color={C.gold} />
+          </TouchableOpacity>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+function AvatarCircle({ uri, role, size = 52 }) {
+  const manager = role === "manager";
+  return (
+    <View
+      style={{
+        width: size,
+        height: size,
+        borderRadius: size / 2,
+        borderWidth: 1,
+        borderColor: C.gold,
+        backgroundColor: C.panel3,
+        alignItems: "center",
+        justifyContent: "center",
+        overflow: "hidden",
+      }}
+    >
+      {uri ? (
+        <Image source={{ uri }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+      ) : (
+        <Ionicons name={manager ? "business-outline" : "person-outline"} size={Math.round(size * 0.48)} color={C.gold} />
+      )}
+    </View>
+  );
+}
+
+function EmptyCard({ icon = "restaurant-outline", title, text }) {
+  return (
+    <View
+      style={{
+        backgroundColor: C.panel2,
+        borderRadius: 20,
+        padding: 20,
+        borderWidth: 1,
+        borderColor: C.border,
+      }}
+    >
+      <Ionicons name={icon} size={30} color={C.gold} />
+      <Text style={{ color: C.text, fontSize: 18, fontWeight: "800", marginTop: 12 }}>
+        {title}
+      </Text>
+      {!!text && (
+        <Text style={{ color: C.muted, fontSize: 14, lineHeight: 20, marginTop: 6 }}>{text}</Text>
+      )}
+    </View>
+  );
+}
+
+function BottomNav({ screen, setScreen }) {
+  const items = [
+    ["home", "home-outline", "Acasă"],
+    ["shifts", "search-outline", "Ture"],
+    ["publish", "add-circle-outline", "Publică"],
+    ["messages", "chatbubble-ellipses-outline", "Mesaje"],
+    ["profile", "person-outline", "Profil"],
+  ];
+  return (
+    <View
+      style={{
+        position: "absolute",
+        left: 0,
+        right: 0,
+        bottom: 0,
+        minHeight: 76,
+        paddingBottom: 6,
+        backgroundColor: "#07101E",
+        borderTopWidth: 1,
+        borderTopColor: C.border,
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-around",
+      }}
+    >
+      {items.map(([target, icon, label]) => {
+        const active = screen === target;
+        return (
+          <TouchableOpacity
+            key={target}
+            onPress={() => setScreen(target)}
+            style={{ alignItems: "center", minWidth: 58, paddingVertical: 8 }}
+          >
+            <Ionicons name={icon} size={23} color={active ? C.gold : C.muted2} />
+            <Text
+              style={{
+                marginTop: 4,
+                fontSize: 11,
+                fontWeight: active ? "800" : "600",
+                color: active ? C.gold : C.muted2,
+              }}
+            >
+              {label}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
+
+function ClocheLogo({ size = 205 }) {
+  const inner = Math.round(size * 0.78);
+  return (
+    <View
+      style={{
+        width: size,
+        height: size,
+        borderRadius: size / 2,
+        borderWidth: 1,
+        borderColor: "rgba(245,185,66,0.12)",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <View
+        style={{
+          width: inner,
+          height: inner,
+          borderRadius: inner / 2,
+          borderWidth: 1,
+          borderColor: "rgba(245,185,66,0.17)",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <View style={{ width: 17, height: 17, borderRadius: 9, backgroundColor: C.gold, marginBottom: 7 }} />
+        <View
+          style={{
+            width: Math.round(inner * 0.62),
+            height: Math.round(inner * 0.31),
+            backgroundColor: C.gold,
+            borderTopLeftRadius: 55,
+            borderTopRightRadius: 55,
+          }}
+        />
+        <View
+          style={{
+            width: Math.round(inner * 0.78),
+            height: 8,
+            borderRadius: 5,
+            backgroundColor: C.gold,
+            marginTop: -2,
+          }}
+        />
+        <View
+          style={{
+            width: Math.round(inner * 0.32),
+            height: Math.round(inner * 0.18),
+            borderLeftWidth: 8,
+            borderBottomWidth: 8,
+            borderColor: C.gold,
+            borderBottomLeftRadius: 17,
+            marginTop: 9,
+            transform: [{ rotate: "-45deg" }],
+          }}
+        />
+      </View>
+    </View>
+  );
+}
+
+function ShiftCard({ shift, favorite, onFavorite, onPress, showStatus = false }) {
+  const statusColor = shift.status === "cancelled" ? C.danger : shift.status === "completed" ? C.success : C.gold;
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.9}
+      style={{
+        backgroundColor: C.panel2,
+        borderRadius: 20,
+        padding: 17,
+        borderWidth: 1,
+        borderColor: C.border,
+        marginBottom: 13,
+      }}
+    >
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
+        {shift.manager_avatar_url ? (
+          <Image
+            source={{ uri: shift.manager_avatar_url }}
+            style={{
+              width: 50,
+              height: 50,
+              borderRadius: 25,
+              borderWidth: 1,
+              borderColor: C.gold,
+              marginRight: 12,
+              backgroundColor: C.panel,
+            }}
+          />
+        ) : (
+          <View
+            style={{
+              width: 50,
+              height: 50,
+              borderRadius: 25,
+              borderWidth: 1,
+              borderColor: C.gold,
+              marginRight: 12,
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: C.panel,
+            }}
+          >
+            <Ionicons name="business-outline" size={23} color={C.gold} />
+          </View>
+        )}
+
+        <View style={{ flex: 1, paddingRight: 10 }}>
+          <Text style={{ color: C.text, fontSize: 18, fontWeight: "900" }}>
+            {shift.location_name || "Locație HoReCa"}
+          </Text>
+          <Text style={{ color: C.gold, fontSize: 14, fontWeight: "800", marginTop: 3 }}>
+            {shift.role || "Ospătar"}
+          </Text>
+          {showStatus && (
+            <View style={{ alignSelf: "flex-start", marginTop: 8, borderRadius: 999, borderWidth: 1, borderColor: statusColor, paddingHorizontal: 10, paddingVertical: 5 }}>
+              <Text style={{ color: statusColor, fontWeight: "900", fontSize: 11 }}>{shiftStatusLabel(shift.status)}</Text>
+            </View>
+          )}
+        </View>
+        {!!onFavorite && (
+          <TouchableOpacity onPress={onFavorite} style={{ padding: 4 }}>
+            <Ionicons name={favorite ? "heart" : "heart-outline"} size={23} color={favorite ? C.gold : C.muted} />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      <View style={{ marginTop: 12 }}>
+        <Text style={{ color: C.muted, fontSize: 14 }}>
+          <Ionicons name="location-outline" size={14} color={C.muted} /> {shift.city || "—"}
+        </Text>
+        <Text style={{ color: C.muted, fontSize: 14, marginTop: 6 }}>
+          <Ionicons name="calendar-outline" size={14} color={C.muted} /> {formatDateRo(shift.shift_date)}
+        </Text>
+        <Text style={{ color: C.muted, fontSize: 14, marginTop: 6 }}>
+          <Ionicons name="time-outline" size={14} color={C.muted} /> {String(shift.start_time || "").slice(0, 5)} – {String(shift.end_time || "").slice(0, 5)}
+        </Text>
+      </View>
+
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 15 }}>
+        <Text style={{ color: C.success, fontWeight: "900", fontSize: 15 }}>{money(shift.hourly_rate)}/oră</Text>
+        <Text style={{ color: C.gold, fontWeight: "900" }}>Vezi detalii ›</Text>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+export default function App() {
+  const [booting, setBooting] = useState(true);
+  const [session, setSession] = useState(null);
+  const [profile, setProfile] = useState(null);
+  const [role, setRole] = useState(null);
+  const [screen, setScreen] = useState("home");
+  const [profileBackTarget, setProfileBackTarget] = useState("role");
+  const [dbError, setDbError] = useState("");
+
+  const [authMode, setAuthMode] = useState("login");
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authName, setAuthName] = useState("");
+  const [showAuthPassword, setShowAuthPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
+  const [authBusy, setAuthBusy] = useState(false);
+  const [authMessage, setAuthMessage] = useState("");
+
+  const [waiterForm, setWaiterForm] = useState({
+    fullName: "",
+    city: "",
+    experience: "",
+    description: "",
+    workerRoles: [],
+    customRoleEnabled: false,
+    customWorkerRole: "",
+    workTypes: [],
+    horecaSkills: [],
+  });
+  const [managerForm, setManagerForm] = useState({
+    locationName: "",
+    locationType: "",
+    locationCity: "",
+    locationAddress: "",
+    contactName: "",
+    contactPhone: "",
+  });
+  const [formError, setFormError] = useState("");
+
+  const [shifts, setShifts] = useState([]);
+  const [availabilities, setAvailabilities] = useState([]);
+  const [favorites, setFavorites] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+  const [conversations, setConversations] = useState([]);
+  const [acceptedShifts, setAcceptedShifts] = useState([]);
+  const [myAvailabilities, setMyAvailabilities] = useState([]);
+  const [myApplications, setMyApplications] = useState([]);
+  const [dataLoading, setDataLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const [shiftQuery, setShiftQuery] = useState("");
+  const [shiftFilter, setShiftFilter] = useState("Toate");
+  const [selectedShift, setSelectedShift] = useState(null);
+  const [applications, setApplications] = useState([]);
+
+  const [selectedDates, setSelectedDates] = useState([]);
+  const [dayAvailability, setDayAvailability] = useState({});
+  const [availabilityError, setAvailabilityError] = useState("");
+
+  const [shiftForm, setShiftForm] = useState({
+    role: "Ospătar",
+    customRole: "",
+    locationName: "",
+    city: "",
+    address: "",
+    date: "",
+    start: "",
+    end: "",
+    workersNeeded: "1",
+    hourlyRate: "",
+    description: "",
+  });
+  const [publishError, setPublishError] = useState("");
+
+  const [chatConversation, setChatConversation] = useState(null);
+  const [chatMessages, setChatMessages] = useState([]);
+  const [chatText, setChatText] = useState("");
+  const [notice, setNotice] = useState(null);
+  const [confirmDialog, setConfirmDialog] = useState(null);
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const [deleteAccountBusy, setDeleteAccountBusy] = useState(false);
+  const [publishBusy, setPublishBusy] = useState(false);
+  const [applyBusy, setApplyBusy] = useState(false);
+  const [waiterDirectory, setWaiterDirectory] = useState([]);
+  const [waiterDirectoryLoading, setWaiterDirectoryLoading] = useState(false);
+  const [waiterDirectoryError, setWaiterDirectoryError] = useState("");
+  const [selectedWorkerProfile, setSelectedWorkerProfile] = useState(null);
+  const [workerProfileLoading, setWorkerProfileLoading] = useState(false);
+  const [workerProfileError, setWorkerProfileError] = useState("");
+  const [shiftBackTarget, setShiftBackTarget] = useState("shifts");
+
+  const showNotice = (message, type = "success") => {
+    const id = Date.now();
+    setNotice({ id, text: message, type });
+    setTimeout(() => {
+      setNotice((current) => (current?.id === id ? null : current));
+    }, 3200);
+  };
+
+  const askConfirm = ({ title, message, confirmLabel = "Confirmă", cancelLabel = "Renunță", danger = false, onConfirm }) => {
+    setConfirmDialog({ title, message, confirmLabel, cancelLabel, danger, onConfirm });
+  };
+
+  const executeConfirm = async () => {
+    const action = confirmDialog?.onConfirm;
+    setConfirmDialog(null);
+    if (action) await action();
+  };
+
+  const currentUserId = session?.user?.id || null;
+  const isManager = role === "manager";
+
+  const profileComplete = useMemo(() => {
+    if (!profile || !role) return false;
+    if (role === "waiter") {
+      return !!(
+        profile.full_name &&
+        profile.city &&
+        profile.experience !== null &&
+        profile.experience !== undefined &&
+        Number(profile.experience) >= 0 &&
+        Array.isArray(profile.worker_roles) &&
+        profile.worker_roles.length > 0 &&
+        Array.isArray(profile.work_types) &&
+        profile.work_types.length > 0 &&
+        Array.isArray(profile.horeca_skills) &&
+        profile.horeca_skills.length > 0
+      );
+    }
+    return !!(
+      profile.location_name &&
+      profile.location_city &&
+      profile.contact_name &&
+      profile.contact_phone
+    );
+  }, [profile, role]);
+
+  const waiterFormDirty = useMemo(() => {
+    if (!profile || role !== "waiter") return false;
+
+    const storedRoles = Array.isArray(profile.worker_roles)
+      ? profile.worker_roles
+      : [];
+
+    const customRole =
+      storedRoles.find((x) => !WORKER_ROLES.includes(x)) || "";
+
+    const current = {
+      fullName: profile.full_name || "",
+      city: profile.city || "",
+      experience:
+        profile.experience !== null && profile.experience !== undefined
+          ? String(profile.experience)
+          : "",
+      description: profile.description || "",
+      workerRoles: storedRoles.filter((x) => WORKER_ROLES.includes(x)),
+      customRoleEnabled: Boolean(customRole),
+      customWorkerRole: customRole,
+      workTypes: Array.isArray(profile.work_types) ? profile.work_types : [],
+      horecaSkills: Array.isArray(profile.horeca_skills)
+        ? profile.horeca_skills
+        : [],
     };
 
-    await AsyncStorage.setItem("turax_waiter_profile", JSON.stringify(profile));
+    return JSON.stringify(waiterForm) !== JSON.stringify(current);
+  }, [waiterForm, profile, role]);
+
+  const managerFormDirty = useMemo(() => {
+    if (!profile || role !== "manager") return false;
+    const current = {
+      locationName: profile.location_name || "",
+      locationType: profile.location_type || "",
+      locationCity: profile.location_city || "",
+      locationAddress: profile.location_address || "",
+      contactName: profile.contact_name || "",
+      contactPhone: profile.contact_phone || "",
+    };
+    return JSON.stringify(managerForm) !== JSON.stringify(current);
+  }, [managerForm, profile, role]);
+
+  const applyProfileToForms = (p) => {
+    if (!p) return;
+
+    const storedRoles = Array.isArray(p.worker_roles)
+      ? p.worker_roles
+      : [];
+
+    const customRole =
+      storedRoles.find((x) => !WORKER_ROLES.includes(x)) || "";
+
+    setWaiterForm({
+      fullName: p.full_name || "",
+      city: p.city || "",
+      experience:
+        p.experience !== null && p.experience !== undefined
+          ? String(p.experience)
+          : "",
+      description: p.description || "",
+      workerRoles: storedRoles.filter((x) => WORKER_ROLES.includes(x)),
+      customRoleEnabled: Boolean(customRole),
+      customWorkerRole: customRole,
+      workTypes: Array.isArray(p.work_types) ? p.work_types : [],
+      horecaSkills: Array.isArray(p.horeca_skills) ? p.horeca_skills : [],
+    });
+
+    setManagerForm({
+      locationName: p.location_name || "",
+      locationType: p.location_type || "",
+      locationCity: p.location_city || "",
+      locationAddress: p.location_address || "",
+      contactName: p.contact_name || "",
+      contactPhone: p.contact_phone || "",
+    });
+  };
+
+  const loadProfile = async (userId, chooseScreen = false) => {
+    if (!userId) return null;
+    const { data, error } = await supabase.from("profiles").select("*").eq("id", userId).maybeSingle();
+    if (error) {
+      setDbError(`Profilul nu poate fi încărcat: ${error.message}`);
+      return null;
+    }
+    setDbError("");
+    setProfile(data || null);
+    const nextRole = data?.role || null;
+    setRole(nextRole);
+    applyProfileToForms(data);
+    if (chooseScreen && nextRole) {
+      const complete =
+        nextRole === "waiter"
+          ? !!(
+              data?.full_name &&
+              data?.city &&
+              data?.experience !== null && data?.experience !== undefined && Number(data.experience) >= 0 &&
+              Array.isArray(data?.worker_roles) &&
+              data.worker_roles.length > 0 &&
+              Array.isArray(data?.work_types) &&
+              data.work_types.length > 0 &&
+              Array.isArray(data?.horeca_skills) &&
+              data.horeca_skills.length > 0
+            )
+          : !!(data?.location_name && data?.location_city && data?.contact_name && data?.contact_phone);
+      if (!complete) setProfileBackTarget("role");
+      setScreen(complete ? "home" : nextRole === "waiter" ? "waiterProfile" : "managerProfile");
+    }
+    return data;
+  };
+
+  useEffect(() => {
+    let mounted = true;
+
+    const boot = async () => {
+      try {
+        const savedRemember = (await AsyncStorage.getItem("turax_remember_me")) === "1";
+        const savedEmail = await AsyncStorage.getItem("turax_remember_email");
+        if (!mounted) return;
+        setRememberMe(savedRemember);
+        if (savedEmail) setAuthEmail(savedEmail);
+
+        const { data } = await supabase.auth.getSession();
+        let current = data.session;
+
+        if (current && !savedRemember) {
+          await supabase.auth.signOut({ scope: "local" });
+          current = null;
+        }
+
+        if (!mounted) return;
+        setSession(current);
+        if (current?.user?.id) {
+          await loadProfile(current.user.id, true);
+        }
+      } catch (e) {
+        if (mounted) setDbError(e?.message || "Eroare la inițializarea aplicației.");
+      } finally {
+        if (mounted) setBooting(false);
+      }
+    };
+
+    boot();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      if (!mounted) return;
+      if (!nextSession) {
+        setSession(null);
+        setRole(null);
+        setProfile(null);
+        setScreen("home");
+        setBooting(false);
+        return;
+      }
+
+      setBooting(true);
+      setSession(nextSession);
+      setTimeout(async () => {
+        if (!mounted) return;
+        await loadProfile(nextSession.user.id, true);
+        if (mounted) setBooting(false);
+      }, 0);
+    });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!currentUserId || !role || !profileComplete) return;
+    refreshCoreData();
+  }, [currentUserId, role, profileComplete]);
+
+  useEffect(() => {
+    if (!currentUserId || !role || !profileComplete) return;
+
+    let timer = null;
+    const scheduleRefresh = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => refreshCoreData(true), 220);
+    };
+
+    let channel = supabase
+      .channel(`turax-core:${currentUserId}:${role}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "shifts" }, scheduleRefresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "applications" }, scheduleRefresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "conversations" }, scheduleRefresh)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "notifications", filter: `user_id=eq.${currentUserId}` },
+        scheduleRefresh
+      );
+
+    if (role === "manager") {
+      channel = channel.on("postgres_changes", { event: "*", schema: "public", table: "availability" }, scheduleRefresh);
+    }
+
+    channel.subscribe();
+    return () => {
+      if (timer) clearTimeout(timer);
+      supabase.removeChannel(channel);
+    };
+  }, [currentUserId, role, profileComplete]);
+
+  useEffect(() => {
+    setShiftFilter("Toate");
+  }, [role]);
+
+  useEffect(() => {
+    if (!chatConversation?.id) return;
+    const channel = supabase
+      .channel(`messages:${chatConversation.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "messages",
+          filter: `conversation_id=eq.${chatConversation.id}`,
+        },
+        (payload) => {
+          setChatMessages((prev) =>
+            prev.some((m) => m.id === payload.new.id) ? prev : [...prev, payload.new]
+          );
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [chatConversation?.id]);
+
+  const handleLogin = async () => {
+    setAuthMessage("");
+    if (!isEmail(authEmail)) return setAuthMessage("Introdu o adresă de email validă.");
+    if (!authPassword) return setAuthMessage("Introdu parola.");
+
+    setAuthBusy(true);
+    try {
+      await AsyncStorage.setItem("turax_remember_me", rememberMe ? "1" : "0");
+      if (rememberMe) {
+        await AsyncStorage.setItem("turax_remember_email", authEmail.trim());
+      } else {
+        await AsyncStorage.removeItem("turax_remember_email");
+      }
+
+      const { error } = await supabase.auth.signInWithPassword({
+        email: authEmail.trim(),
+        password: authPassword,
+      });
+      if (error) setAuthMessage(error.message);
+    } finally {
+      setAuthBusy(false);
+    }
+  };
+
+  const handleSignup = async () => {
+    setAuthMessage("");
+    if (authName.trim().length < 2) return setAuthMessage("Introdu numele tău.");
+    if (!isEmail(authEmail)) return setAuthMessage("Introdu o adresă de email validă.");
+    if (authPassword.length < 8) return setAuthMessage("Parola trebuie să aibă cel puțin 8 caractere.");
+
+    setAuthBusy(true);
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: authEmail.trim(),
+        password: authPassword,
+        options: { data: { full_name: authName.trim() } },
+      });
+      if (error) return setAuthMessage(error.message);
+
+      if (data.session?.user?.id) {
+        await supabase
+          .from("profiles")
+          .upsert({ id: data.session.user.id, full_name: authName.trim() }, { onConflict: "id" });
+      }
+      setAuthMessage(
+        data.session
+          ? "Cont creat. Alege profilul potrivit pentru tine."
+          : "Cont creat. Verifică emailul pentru confirmare, apoi autentifică-te."
+      );
+      if (!data.session) setAuthMode("login");
+    } finally {
+      setAuthBusy(false);
+    }
+  };
+
+  const resetPassword = async () => {
+    setAuthMessage("");
+    if (!isEmail(authEmail)) return setAuthMessage("Introdu întâi adresa de email.");
+    const { error } = await supabase.auth.resetPasswordForEmail(authEmail.trim());
+    setAuthMessage(error ? error.message : "Instrucțiunile pentru resetarea parolei au fost trimise.");
+  };
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    setSession(null);
+    setProfile(null);
+    setRole(null);
+    setScreen("home");
+    setAuthPassword("");
+  };
+
+  const handleDeleteAccount = () => {
+    if (deleteAccountBusy) return;
+
+    Alert.alert(
+      "Șterge contul?",
+      "Contul și datele asociate vor fi șterse definitiv.",
+      [
+        {
+          text: "Renunță",
+          style: "cancel",
+        },
+        {
+          text: "Continuă",
+          style: "destructive",
+          onPress: () => {
+            Alert.alert(
+              "Ștergere definitivă",
+              "Această acțiune nu poate fi anulată. Ești sigur că vrei să ștergi definitiv contul?",
+              [
+                {
+                  text: "Renunță",
+                  style: "cancel",
+                },
+                {
+                  text: "Șterge definitiv",
+                  style: "destructive",
+                  onPress: async () => {
+                    if (deleteAccountBusy) return;
+
+                    setDeleteAccountBusy(true);
+
+                    try {
+                      const { data, error } = await supabase.functions.invoke(
+                        "delete-account",
+                        {
+                          body: { confirm: true },
+                        }
+                      );
+
+                      if (error) {
+                        let message =
+                          error.message ||
+                          "Contul nu a putut fi șters.";
+
+                        try {
+                          const payload =
+                            typeof error?.context?.json === "function"
+                              ? await error.context.json()
+                              : null;
+
+                          if (payload?.error) {
+                            message = payload.error;
+                          }
+                        } catch (_) {}
+
+                        throw new Error(message);
+                      }
+
+                      if (!data?.success) {
+                        throw new Error(
+                          data?.error ||
+                            "Contul nu a putut fi șters."
+                        );
+                      }
+
+                      await supabase.auth.signOut({ scope: "local" });
+
+                      setSession(null);
+                      setProfile(null);
+                      setRole(null);
+                      setScreen("home");
+                      setAuthPassword("");
+
+                      Alert.alert(
+                        "Cont șters",
+                        "Contul tău a fost șters definitiv."
+                      );
+                    } catch (error) {
+                      Alert.alert(
+                        "Ștergerea nu a reușit",
+                        error?.message ||
+                          "A apărut o eroare la ștergerea contului."
+                      );
+                    } finally {
+                      setDeleteAccountBusy(false);
+                    }
+                  },
+                },
+              ]
+            );
+          },
+        },
+      ]
+    );
+  };
+
+  const chooseRole = async (nextRole) => {
+    if (!currentUserId) return;
+    setDbError("");
+    const payload = {
+      id: currentUserId,
+      role: nextRole,
+      email: session?.user?.email || null,
+      updated_at: new Date().toISOString(),
+    };
+    const { data, error } = await supabase
+      .from("profiles")
+      .upsert(payload, { onConflict: "id" })
+      .select("*")
+      .single();
+
+    if (error) {
+      setDbError(`Rolul nu a putut fi salvat: ${error.message}`);
+      return;
+    }
+    setProfile(data);
+    setRole(nextRole);
+    applyProfileToForms(data);
+    setProfileBackTarget("role");
+    setScreen(nextRole === "waiter" ? "waiterProfile" : "managerProfile");
+  };
+
+  const saveWaiterProfile = async () => {
+    setFormError("");
+
+    const exp = Number(waiterForm.experience);
+
+    if (waiterForm.fullName.trim().length < 2)
+      return setFormError("Completează numele complet.");
+
+    if (waiterForm.city.trim().length < 2)
+      return setFormError("Completează orașul.");
+
+    if (!Number.isFinite(exp) || exp < 0 || exp > 60)
+      return setFormError("Introdu corect anii de experiență.");
+
+    const customRole = waiterForm.customRoleEnabled
+      ? String(waiterForm.customWorkerRole || "").trim()
+      : "";
+
+    if (waiterForm.customRoleEnabled && customRole.length < 2)
+      return setFormError("Specifică rolul HoReCa.");
+
+    if (customRole.length > 60)
+      return setFormError("Rolul poate avea maximum 60 de caractere.");
+
+    const workerRoles = [
+      ...(waiterForm.workerRoles || []),
+      ...(customRole ? [customRole] : []),
+    ]
+      .map((x) => String(x).trim())
+      .filter(Boolean);
+
+    const uniqueRoles = workerRoles.filter(
+      (x, i, arr) =>
+        arr.findIndex(
+          (y) =>
+            y.toLocaleLowerCase("ro-RO") ===
+            x.toLocaleLowerCase("ro-RO")
+        ) === i
+    );
+
+    if (uniqueRoles.length === 0)
+      return setFormError("Selectează cel puțin un rol profesional.");
+
+    if (waiterForm.workTypes.length === 0)
+      return setFormError("Selectează cel puțin un tip de experiență.");
+
+    if (waiterForm.horecaSkills.length === 0)
+      return setFormError("Selectează cel puțin o competență HoReCa.");
+
+    const payload = {
+      id: currentUserId,
+      role: "waiter",
+      full_name: waiterForm.fullName.trim(),
+      city: waiterForm.city.trim(),
+      experience: exp,
+      description: waiterForm.description.trim() || null,
+      worker_roles: uniqueRoles,
+      work_types: waiterForm.workTypes,
+      horeca_skills: waiterForm.horecaSkills,
+      updated_at: new Date().toISOString(),
+    };
+
+    const { data, error } = await supabase
+      .from("profiles")
+      .upsert(payload, { onConflict: "id" })
+      .select("*")
+      .single();
+
+    if (error) return setFormError(error.message);
+
+    await AsyncStorage.setItem(
+      "turax_waiter_profile",
+      JSON.stringify(payload)
+    );
+
+    setProfile(data);
+    setRole("waiter");
+    applyProfileToForms(data);
+    showNotice("Profilul a fost actualizat.");
+    setScreen("home");
   };
 
   const saveManagerProfile = async () => {
-    const managerProfile = {
-      locationName,
-      locationType,
-      locationCity,
-      locationAddress,
-      contactName,
-      contactPhone,
+    setFormError("");
+    if (managerForm.locationName.trim().length < 2) return setFormError("Completează numele locației.");
+    if (managerForm.locationType.trim().length < 2) return setFormError("Completează tipul locației.");
+    if (managerForm.locationCity.trim().length < 2) return setFormError("Completează orașul.");
+    if (managerForm.locationAddress.trim().length < 3) return setFormError("Completează adresa sau zona.");
+    if (managerForm.contactName.trim().length < 2) return setFormError("Completează persoana de contact.");
+    if (cleanPhone(managerForm.contactPhone).length < 7) return setFormError("Introdu un număr de telefon valid.");
+
+    const payload = {
+      id: currentUserId,
+      role: "manager",
+      location_name: managerForm.locationName.trim(),
+      location_type: managerForm.locationType.trim(),
+      location_city: managerForm.locationCity.trim(),
+      location_address: managerForm.locationAddress.trim(),
+      contact_name: managerForm.contactName.trim(),
+      contact_phone: cleanPhone(managerForm.contactPhone),
+      updated_at: new Date().toISOString(),
     };
 
-    await AsyncStorage.setItem("turax_manager_profile", JSON.stringify(managerProfile));
-    setScreen("employer");
+    const { data, error } = await supabase
+      .from("profiles")
+      .upsert(payload, { onConflict: "id" })
+      .select("*")
+      .single();
+
+    if (error) return setFormError(error.message);
+    await AsyncStorage.setItem("turax_manager_profile", JSON.stringify(payload));
+    setProfile(data);
+    setRole("manager");
+    showNotice("Profilul a fost actualizat.");
+    setScreen("home");
   };
 
-  const publishAvailability = () => {
-    const newPost = {
-      id: Date.now().toString(),
-      type: 'waiter',
-      name: fullName || authName || 'Ospătar',
-      dates: selectedDates,
-      availability: dayAvailability,
-      createdAt: new Date().toISOString(),
+  const refreshCoreData = async (silent = false) => {
+    if (!currentUserId || !role) return;
+    if (!silent) setDataLoading(true);
+    setDbError("");
+    try {
+      const [shiftResult, favoriteResult, notificationResult, conversationResult] = await Promise.all([
+        role === "waiter"
+          ? supabase
+              .from("shifts")
+              .select("*")
+              .eq("status", "open")
+              .gte("shift_date", todayIso())
+              .order("shift_date", { ascending: true })
+          : supabase
+              .from("shifts")
+              .select("*")
+              .eq("manager_id", currentUserId)
+              .order("shift_date", { ascending: false }),
+        supabase.from("favorites").select("shift_id").eq("user_id", currentUserId),
+        supabase
+          .from("notifications")
+          .select("*")
+          .eq("user_id", currentUserId)
+          .order("created_at", { ascending: false })
+          .limit(50),
+        supabase
+          .from("conversations")
+          .select("*")
+          .or(`manager_id.eq.${currentUserId},waiter_id.eq.${currentUserId}`)
+          .order("updated_at", { ascending: false }),
+      ]);
+
+      const commonError = [shiftResult, favoriteResult, notificationResult, conversationResult].find((r) => r.error)?.error;
+      if (commonError) throw commonError;
+
+      const incomingShifts = shiftResult.data || [];
+      const visibleShifts = role === "waiter"
+        ? incomingShifts.filter((s) => {
+            const start = shiftStartDate(s);
+            return s.status === "open" && !!start && start.getTime() > Date.now();
+          })
+        : incomingShifts;
+      setShifts(visibleShifts);
+      setFavorites((favoriteResult.data || []).map((x) => x.shift_id));
+      setNotifications(notificationResult.data || []);
+
+      const conversationRows = conversationResult.data || [];
+      let enrichedConversations = conversationRows;
+      if (conversationRows.length > 0) {
+        const ids = conversationRows.map((c) => c.id);
+        const { data: unreadRows, error: unreadError } = await supabase
+          .from("messages")
+          .select("conversation_id")
+          .in("conversation_id", ids)
+          .is("read_at", null)
+          .neq("sender_id", currentUserId);
+        if (unreadError) throw unreadError;
+        const counts = (unreadRows || []).reduce((acc, row) => {
+          acc[row.conversation_id] = (acc[row.conversation_id] || 0) + 1;
+          return acc;
+        }, {});
+        enrichedConversations = conversationRows.map((c) => ({ ...c, unread_count: counts[c.id] || 0 }));
+      }
+      setConversations(enrichedConversations);
+
+      if (role === "manager") {
+        const { data, error } = await supabase
+          .from("availability")
+          .select("*")
+          .gte("available_date", todayIso())
+          .order("available_date", { ascending: true })
+          .limit(100);
+        if (error) throw error;
+        setAvailabilities(data || []);
+        setAcceptedShifts([]);
+        setMyAvailabilities([]);
+        setMyApplications([]);
+      } else {
+        const [availabilityResult, applicationsResult] = await Promise.all([
+          supabase
+            .from("availability")
+            .select("*")
+            .eq("waiter_id", currentUserId)
+            .gte("available_date", todayIso())
+            .order("available_date", { ascending: true }),
+          supabase
+            .from("applications")
+            .select("*, shifts(*)")
+            .eq("waiter_id", currentUserId)
+            .order("created_at", { ascending: false }),
+        ]);
+        if (availabilityResult.error) throw availabilityResult.error;
+        if (applicationsResult.error) throw applicationsResult.error;
+
+        const apps = applicationsResult.data || [];
+        setMyAvailabilities(availabilityResult.data || []);
+        setMyApplications(apps);
+        setAcceptedShifts(apps.filter((a) => ["accepted", "completed", "no_show"].includes(a.status)));
+        setAvailabilities([]);
+      }
+    } catch (e) {
+      setDbError(
+        `Datele nu pot fi încărcate. Dacă tocmai ai aplicat upgrade-ul, rulează și migrarea Supabase. Detaliu: ${e?.message || e}`
+      );
+    } finally {
+      setDataLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const refresh = async () => {
+    setRefreshing(true);
+    await refreshCoreData(true);
+  };
+
+  const toggleFavorite = async (shiftId) => {
+    const isFav = favorites.includes(shiftId);
+    setFavorites((prev) => (isFav ? prev.filter((id) => id !== shiftId) : [...prev, shiftId]));
+    const result = isFav
+      ? await supabase.from("favorites").delete().eq("user_id", currentUserId).eq("shift_id", shiftId)
+      : await supabase.from("favorites").insert({ user_id: currentUserId, shift_id: shiftId });
+    if (result.error) {
+      setFavorites((prev) => (isFav ? [...prev, shiftId] : prev.filter((id) => id !== shiftId)));
+      Alert.alert("TuraX", result.error.message);
+    }
+  };
+
+  const openShift = async (shift, backTarget = "shifts") => {
+    setShiftBackTarget(backTarget);
+    setSelectedShift(shift);
+    setApplications([]);
+    if (role === "manager" && shift?.id) {
+      const { data, error } = await supabase
+        .from("applications")
+        .select("*")
+        .eq("shift_id", shift.id)
+        .order("created_at", { ascending: true });
+      if (!error) setApplications(data || []);
+    }
+    setScreen("shiftDetail");
+  };
+
+  const openWaiterDirectory = async () => {
+    setScreen("waiterDirectory");
+    setWaiterDirectoryLoading(true);
+    setWaiterDirectoryError("");
+    try {
+      const { data, error } = await supabase.rpc("list_waiter_directory");
+      if (error) throw error;
+      setWaiterDirectory(data || []);
+    } catch (e) {
+      setWaiterDirectoryError(e?.message || "Catalogul nu poate fi incarcat.");
+    } finally {
+      setWaiterDirectoryLoading(false);
+    }
+  };
+
+  const openWorkerPublicProfile = async (worker) => {
+    if (!worker?.waiter_id) return;
+
+    setSelectedWorkerProfile(worker);
+    setWorkerProfileError("");
+    setWorkerProfileLoading(true);
+    setScreen("workerProfile");
+
+    try {
+      const { data, error } = await supabase.rpc(
+        "get_worker_public_profile",
+        { p_waiter_id: worker.waiter_id }
+      );
+
+      if (error) throw error;
+
+      if (data) {
+        setSelectedWorkerProfile(data);
+      }
+    } catch (e) {
+      setWorkerProfileError(
+        e?.message || "Profilul profesionistului nu a putut fi încărcat."
+      );
+    } finally {
+      setWorkerProfileLoading(false);
+    }
+  };
+
+  const reloadSelectedShift = async () => {
+    if (!selectedShift?.id) return;
+    const { data: freshShift, error: shiftError } = await supabase
+      .from("shifts")
+      .select("*")
+      .eq("id", selectedShift.id)
+      .maybeSingle();
+    if (shiftError) {
+      showNotice(shiftError.message, "error");
+      return;
+    }
+    if (freshShift) setSelectedShift(freshShift);
+
+    if (role === "manager") {
+      const { data: freshApplications, error: applicationsError } = await supabase
+        .from("applications")
+        .select("*")
+        .eq("shift_id", selectedShift.id)
+        .order("created_at", { ascending: true });
+      if (applicationsError) {
+        showNotice(applicationsError.message, "error");
+        return;
+      }
+      setApplications(freshApplications || []);
+    }
+  };
+
+  const applyToShift = async () => {
+    if (!selectedShift?.id || !currentUserId || applyBusy) return;
+
+    const allowedRoles = Array.isArray(profile?.worker_roles)
+      ? profile.worker_roles
+      : [];
+
+    const roleMatches = allowedRoles.some(
+      (workerRole) =>
+        String(workerRole || "").trim().toLocaleLowerCase("ro-RO") ===
+        String(selectedShift.role || "").trim().toLocaleLowerCase("ro-RO")
+    );
+
+    if (role === "waiter" && !roleMatches) {
+      showNotice("Rolul acestei ture nu este inclus în profilul tău.", "error");
+      return;
+    }
+
+    const existing = myApplications.find((a) => a.shift_id === selectedShift.id);
+    if (existing) {
+      showNotice(`Ai deja o candidatură pentru această tură: ${applicationStatusLabel(existing.status)}.`, "info");
+      return;
+    }
+
+    const start = shiftStartDate(selectedShift);
+    if (!start || start.getTime() <= Date.now()) {
+      showNotice("Tura a început deja și nu mai primește candidaturi.", "error");
+      return;
+    }
+
+    setApplyBusy(true);
+    try {
+      const { error } = await supabase.rpc("apply_to_shift", { p_shift_id: selectedShift.id });
+      if (error) return showNotice(error.message, "error");
+      await refreshCoreData(true);
+      await reloadSelectedShift();
+      showNotice("Candidatura a fost trimisă. Status: În așteptare.");
+    } finally {
+      setApplyBusy(false);
+    }
+  };
+
+  const updateApplication = async (applicationId, status) => {
+    const { error } = await supabase.rpc("manager_set_application_status", {
+      p_application_id: applicationId,
+      p_status: status,
+    });
+    if (error) return Alert.alert("TuraX", error.message);
+    setApplications((prev) => prev.map((a) => (a.id === applicationId ? { ...a, status } : a)));
+    await refreshCoreData(true);
+    await reloadSelectedShift();
+    showNotice(status === "accepted" ? "Candidatura a fost acceptată." : "Candidatura a fost respinsă.");
+  };
+
+  const publishAvailability = async () => {
+    setAvailabilityError("");
+    if (selectedDates.length === 0) return setAvailabilityError("Selectează cel puțin o dată.");
+
+    for (const date of selectedDates) {
+      const info = dayAvailability[date] || {};
+      if (!info.start || !info.end || !info.rate) {
+        return setAvailabilityError(`Completează ora de început, ora de final și tariful pentru ${formatDateRo(date)}.`);
+      }
+      if (!isPublishStartAllowed(date, info.start)) {
+        return setAvailabilityError(`Pentru ${formatDateRo(date)}, ora de început trebuie să fie cu cel puțin 60 de minute în viitor.`);
+      }
+      if (Number(info.rate) <= 0) return setAvailabilityError("Tariful trebuie să fie mai mare decât 0.");
+    }
+
+    const rows = selectedDates.map((date) => {
+      const info = dayAvailability[date];
+      return {
+        waiter_id: currentUserId,
+        waiter_name: profile?.full_name || "Ospătar",
+        city: profile?.city || null,
+        available_date: date,
+        start_time: info.start,
+        end_time: info.end,
+        desired_rate: Number(info.rate),
+        waiter_avatar_url: profile?.avatar_url || null,
+      };
+    });
+
+    const { error } = await supabase
+      .from("availability")
+      .upsert(rows, { onConflict: "waiter_id,available_date" });
+
+    if (error) return setAvailabilityError(error.message);
+
+    setSelectedDates([]);
+    setDayAvailability({});
+    await refreshCoreData(true);
+    showNotice("Disponibilitatea a fost publicată.");
+    setScreen("myActivity");
+  };
+
+  const withdrawAvailability = (row) => {
+    askConfirm({
+      title: "Retrage disponibilitatea?",
+      message: `${formatDateRo(row.available_date)} · ${String(row.start_time || "").slice(0, 5)}–${String(row.end_time || "").slice(0, 5)}`,
+      confirmLabel: "Retrage",
+      danger: true,
+      onConfirm: async () => {
+        const { error } = await supabase
+          .from("availability")
+          .delete()
+          .eq("id", row.id)
+          .eq("waiter_id", currentUserId);
+        if (error) return showNotice(error.message, "error");
+        await refreshCoreData(true);
+        showNotice("Disponibilitatea a fost retrasă.");
+      },
+    });
+  };
+
+  const cancelMyApplication = (application) => {
+    const confirmed = application.status === "accepted";
+    const allowed = !confirmed || canCancelConfirmedShift(application.shifts);
+    if (confirmed && !allowed) {
+      showNotice("Anularea este blocată cu 48 de ore sau mai puțin înainte de începerea turei.", "error");
+      return;
+    }
+
+    askConfirm({
+      title: confirmed ? "Anulezi tura confirmată?" : "Retragi candidatura?",
+      message: confirmed
+        ? "Locul va fi eliberat pentru alt ospătar. Regula de 48h este verificată și de server."
+        : "Candidatura va apărea în istoric ca anulată.",
+      confirmLabel: confirmed ? "Anulează tura" : "Retrage",
+      danger: true,
+      onConfirm: async () => {
+        const { error } = await supabase.rpc("cancel_my_application", {
+          p_application_id: application.id,
+        });
+        if (error) return showNotice(error.message, "error");
+        await refreshCoreData(true);
+        showNotice(confirmed ? "Tura a fost anulată și locul a fost eliberat." : "Candidatura a fost retrasă.");
+      },
+    });
+  };
+
+  const cancelShiftByManager = (shift) => {
+    if (!shift?.id) return;
+    askConfirm({
+      title: "Anulezi tura?",
+      message: "Candidații aflați în așteptare sau deja confirmați vor fi anunțați automat.",
+      confirmLabel: "Anulează tura",
+      danger: true,
+      onConfirm: async () => {
+        const { error } = await supabase.rpc("manager_cancel_shift", {
+          p_shift_id: shift.id,
+          p_reason: "Anulată de manager din aplicația TuraX",
+        });
+        if (error) return showNotice(error.message, "error");
+        await refreshCoreData(true);
+        await reloadSelectedShift();
+        showNotice("Tura a fost anulată. Participanții au fost notificați.");
+      },
+    });
+  };
+
+  const markAttendance = (application, result) => {
+    const noShow = result === "no_show";
+    askConfirm({
+      title: noShow ? "Marchezi neprezentarea?" : "Confirmi tura finalizată?",
+      message: noShow
+        ? "Această acțiune va rămâne în istoricul turei și ospătarul va putea primi un rating corespunzător."
+        : "Confirmă că ospătarul s-a prezentat și tura s-a încheiat.",
+      confirmLabel: noShow ? "Marchează no-show" : "Confirmă prezența",
+      danger: noShow,
+      onConfirm: async () => {
+        const { error } = await supabase.rpc("manager_mark_attendance", {
+          p_application_id: application.id,
+          p_result: result,
+        });
+        if (error) return showNotice(error.message, "error");
+        await refreshCoreData(true);
+        await reloadSelectedShift();
+        showNotice(noShow ? "Neprezentarea a fost înregistrată." : "Tura a fost marcată ca finalizată.");
+      },
+    });
+  };
+
+  const submitShiftRating = async ({ shiftId, revieweeId, rating }) => {
+    const { error } = await supabase.rpc("submit_shift_review", {
+      p_shift_id: shiftId,
+      p_reviewee_id: revieweeId,
+      p_rating: rating,
+      p_comment: null,
+    });
+    if (error) return showNotice(error.message, "error");
+    showNotice(`Rating salvat: ${rating}/5.`);
+  };
+
+  const publishShift = async () => {
+    if (publishBusy) return;
+    setPublishError("");
+    const needed = Number(shiftForm.workersNeeded);
+    const rate = Number(shiftForm.hourlyRate);
+    const effectiveRole =
+      shiftForm.role === "Altele"
+        ? String(shiftForm.customRole || "").trim()
+        : String(shiftForm.role || "").trim();
+
+    if (!effectiveRole) {
+      return setPublishError("Alege rolul căutat.");
+    }
+
+    if (shiftForm.role === "Altele" && effectiveRole.length < 2) {
+      return setPublishError("Specifică rolul necesar.");
+    }
+
+    if (effectiveRole.length > 60) {
+      return setPublishError("Denumirea rolului poate avea maximum 60 de caractere.");
+    }
+
+    if (!shiftForm.locationName.trim()) return setPublishError("Completează numele locației.");
+    if (!shiftForm.city.trim()) return setPublishError("Completează orașul.");
+    if (!shiftForm.date) return setPublishError("Selectează data turei.");
+    if (!shiftForm.start || !shiftForm.end) return setPublishError("Selectează intervalul orar.");
+    if (!Number.isInteger(needed) || needed < 1) return setPublishError("Numărul de persoane necesare trebuie să fie cel puțin 1.");
+    if (!Number.isFinite(rate) || rate <= 0) return setPublishError("Introdu un tarif orar valid.");
+
+    if (!isPublishStartAllowed(shiftForm.date, shiftForm.start)) {
+      return setPublishError("Tura trebuie să înceapă cu cel puțin 60 de minute de acum.");
+    }
+
+    setPublishBusy(true);
+    try {
+      const { error } = await supabase.rpc("publish_shift", {
+        p_role: effectiveRole,
+        p_location_name: shiftForm.locationName.trim(),
+        p_city: shiftForm.city.trim(),
+        p_address: shiftForm.address.trim() || null,
+        p_shift_date: shiftForm.date,
+        p_start_time: shiftForm.start,
+        p_end_time: shiftForm.end,
+        p_workers_needed: needed,
+        p_hourly_rate: rate,
+        p_description: shiftForm.description.trim() || null,
+      });
+
+      if (error) return setPublishError(error.message);
+
+      setShiftForm({
+        role: "Ospătar",
+        customRole: "",
+        locationName: profile?.location_name || "",
+        city: profile?.location_city || "",
+        address: profile?.location_address || "",
+        date: "",
+        start: "",
+        end: "",
+        workersNeeded: "1",
+        hourlyRate: "",
+        description: "",
+      });
+      await refreshCoreData(true);
+      showNotice("Tura a fost publicată.");
+      setScreen("home");
+    } finally {
+      setPublishBusy(false);
+    }
+  };
+
+  const openConversation = async ({ shift = null, waiter = null } = {}) => {
+    if (!currentUserId) return;
+
+    const contextShift = shift || selectedShift || null;
+    const otherUserId = role === "waiter" ? contextShift?.manager_id : waiter?.waiter_id;
+
+    if (!otherUserId) {
+      showNotice("Nu am putut identifica participantul conversației.", "error");
+      return;
+    }
+
+    const { data, error } = await supabase
+      .rpc("ensure_conversation", {
+        p_other_user_id: otherUserId,
+        p_shift_id: contextShift?.id || null,
+      })
+      .single();
+
+    if (error) return showNotice(error.message, "error");
+
+    setChatConversation(data);
+    await loadChat(data.id);
+    setScreen("chat");
+  };
+
+  const loadChat = async (conversationId) => {
+    const readResult = await supabase.rpc("mark_conversation_read", {
+      p_conversation_id: conversationId,
+    });
+    if (readResult.error) console.log("TuraX read messages:", readResult.error.message);
+
+    const { data, error } = await supabase
+      .from("messages")
+      .select("*")
+      .eq("conversation_id", conversationId)
+      .order("created_at", { ascending: true });
+    if (error) return Alert.alert("TuraX", error.message);
+    setChatMessages(data || []);
+    setConversations((prev) => prev.map((c) => c.id === conversationId ? { ...c, unread_count: 0 } : c));
+    setNotifications((prev) => prev.map((n) => {
+      const payload = n.data && typeof n.data === "object" ? n.data : {};
+      return n.type === "message_new" && payload.conversation_id === conversationId && !n.read_at
+        ? { ...n, read_at: new Date().toISOString() }
+        : n;
+    }));
+  };
+
+  const sendMessage = async () => {
+    const body = chatText.trim();
+    if (!body || !chatConversation?.id) return;
+    const tempId = `temp-${Date.now()}`;
+    const optimistic = {
+      id: tempId,
+      conversation_id: chatConversation.id,
+      sender_id: currentUserId,
+      body,
+      created_at: new Date().toISOString(),
+      _sending: true,
     };
-    setPosts(prev => [newPost, ...prev]);
-    setScreen("feed");
+    setChatText("");
+    setChatMessages((prev) => [...prev, optimistic]);
+
+    const { data, error } = await supabase
+      .from("messages")
+      .insert({ conversation_id: chatConversation.id, sender_id: currentUserId, body })
+      .select("*")
+      .single();
+    if (error) {
+      setChatMessages((prev) => prev.filter((m) => m.id !== tempId));
+      setChatText(body);
+      return Alert.alert("TuraX", error.message);
+    }
+
+    setChatMessages((prev) => {
+      const clean = prev.filter((m) => m.id !== tempId && m.id !== data.id);
+      return [...clean, data].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    });
+    setConversations((prev) => prev.map((c) => c.id === chatConversation.id ? {
+      ...c,
+      last_message: body,
+      last_message_at: data.created_at,
+      last_sender_id: currentUserId,
+    } : c));
   };
 
-  if (screen === 'feed') {
+  const openConversationFromList = async (conversation) => {
+    setChatConversation(conversation);
+    await loadChat(conversation.id);
+    setScreen("chat");
+  };
+
+  const markNotificationRead = async (n) => {
+    if (!n?.id || n.read_at) return;
+    const now = new Date().toISOString();
+    setNotifications((prev) => prev.map((x) => (x.id === n.id ? { ...x, read_at: now } : x)));
+    await supabase.from("notifications").update({ read_at: now }).eq("id", n.id);
+  };
+
+  const openNotification = async (n) => {
+    if (!n) return;
+    await markNotificationRead(n);
+    const payload = n.data && typeof n.data === "object" ? n.data : {};
+
+    if (n.type === "message_new" && payload.conversation_id) {
+      const { data: conversation, error } = await supabase
+        .from("conversations")
+        .select("*")
+        .eq("id", payload.conversation_id)
+        .maybeSingle();
+      if (error) return Alert.alert("TuraX", error.message);
+      if (conversation) {
+        await openConversationFromList(conversation);
+        return;
+      }
+    }
+
+    if (payload.shift_id) {
+      const { data: shift, error } = await supabase
+        .from("shifts")
+        .select("*")
+        .eq("id", payload.shift_id)
+        .maybeSingle();
+      if (error) return Alert.alert("TuraX", error.message);
+      if (shift) {
+        await openShift(shift);
+        return;
+      }
+    }
+
+    if (role === "waiter" && ["application_status", "application_cancelled"].includes(n.type)) {
+      setScreen("myActivity");
+      return;
+    }
+
+    showNotice("Notificarea a fost marcată ca citită.", "info");
+  };
+
+  const pickProfilePhoto = async () => {
+    if (!currentUserId || photoBusy) return;
+    setPhotoBusy(true);
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        showNotice("Permite accesul la fotografii pentru a alege poza de profil.", "error");
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.78,
+        base64: true,
+      });
+      if (result.canceled) return;
+      const asset = result.assets?.[0];
+      if (!asset?.base64) return showNotice("Fotografia nu a putut fi citită.", "error");
+      if (asset.fileSize && asset.fileSize > 5 * 1024 * 1024) {
+        return showNotice("Alege o fotografie mai mică de 5 MB.", "error");
+      }
+
+      const mimeType = asset.mimeType || "image/jpeg";
+      const ext = mimeType.includes("png") ? "png" : mimeType.includes("webp") ? "webp" : "jpg";
+      const objectPath = `${currentUserId}/avatar.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from("turax-avatars")
+        .upload(objectPath, decode(asset.base64), { contentType: mimeType, upsert: true, cacheControl: "3600" });
+      if (uploadError) return showNotice(uploadError.message, "error");
+
+      const { data: publicData } = supabase.storage.from("turax-avatars").getPublicUrl(objectPath);
+      const publicUrl = `${publicData.publicUrl}?v=${Date.now()}`;
+      const { data: updatedProfile, error: profileError } = await supabase
+        .rpc("sync_my_avatar", { p_avatar_url: publicUrl })
+        .single();
+      if (profileError) return showNotice(profileError.message, "error");
+
+      setProfile(updatedProfile);
+      await refreshCoreData(true);
+      showNotice(role === "manager" ? "Logo-ul locației a fost actualizat." : "Poza de profil a fost actualizată.");
+    } catch (e) {
+      showNotice(e?.message || "Fotografia nu a putut fi încărcată.", "error");
+    } finally {
+      setPhotoBusy(false);
+    }
+  };
+
+  const requestProfileBack = (kind) => {
+    const dirty = kind === "waiter" ? waiterFormDirty : managerFormDirty;
+    const leave = () => {
+      setFormError("");
+      applyProfileToForms(profile);
+      if (profileBackTarget === "profile") {
+        setScreen("profile");
+      } else {
+        setRole(null);
+        setScreen("home");
+      }
+    };
+    if (!dirty) return leave();
+    askConfirm({
+      title: "Renunți la modificări?",
+      message: "Ai modificări nesalvate în profil.",
+      confirmLabel: "Renunță",
+      cancelLabel: "Rămân aici",
+      danger: true,
+      onConfirm: leave,
+    });
+  };
+
+  const filteredShifts = useMemo(() => {
+    let list = [...shifts];
+    const q = shiftQuery.trim().toLowerCase();
+    if (q) {
+      list = list.filter((s) =>
+        [s.location_name, s.city, s.role, s.description]
+          .filter(Boolean)
+          .some((v) => String(v).toLowerCase().includes(q))
+      );
+    }
+    if (role === "manager") {
+      if (shiftFilter === "Active") list = list.filter((s) => ["open", "closed"].includes(s.status) && !hasShiftEnded(s));
+      if (shiftFilter === "Ocupate") list = list.filter((s) => s.status === "closed");
+      if (shiftFilter === "Finalizate") list = list.filter((s) => s.status === "completed");
+      if (shiftFilter === "Anulate") list = list.filter((s) => s.status === "cancelled");
+      return list;
+    }
+
+    const myWorkerRoles = Array.isArray(profile?.worker_roles)
+      ? profile.worker_roles
+      : [];
+
+    if (myWorkerRoles.length > 0) {
+      list = list.filter((shift) =>
+        myWorkerRoles.some(
+          (workerRole) =>
+            String(workerRole || "").trim().toLocaleLowerCase("ro-RO") ===
+            String(shift.role || "").trim().toLocaleLowerCase("ro-RO")
+        )
+      );
+    }
+
+    if (shiftFilter === "Azi") list = list.filter((s) => s.shift_date === todayIso());
+    if (shiftFilter === "Mâine") list = list.filter((s) => s.shift_date === addDaysIso(1));
+    if (shiftFilter === "Weekend") {
+      list = list.filter((s) => {
+        const d = new Date(`${s.shift_date}T12:00:00`).getDay();
+        return d === 0 || d === 6;
+      });
+    }
+    if (shiftFilter === "Favorite") list = list.filter((s) => favorites.includes(s.id));
+    return list;
+  }, [shifts, shiftQuery, shiftFilter, favorites, role, profile]);
+
+  const unreadCount = notifications.filter((n) => !n.read_at).length;
+
+  if (booting) {
     return (
-      <SafeAreaView style={styles.container}>
-        <ScrollView contentContainerStyle={styles.formPage}>
-          <Text style={styles.pageTitle}>Feed TuraX</Text>
-          {posts.length === 0 ? (
-            <Text>Nu există postări încă.</Text>
-          ) : (
-            posts.map(post => (
-              <View key={post.id} style={{marginBottom:16,padding:16,borderWidth:1,borderColor:'#D1D5DB',borderRadius:12}}>
-                <Text style={{fontWeight:'700',fontSize:18}}>{post.name}</Text>
-                <Text>Disponibilitate ospătar</Text>
-              </View>
-            ))
-          )}
-        </ScrollView>
-      </SafeAreaView>
-    );
-  }
-
-
-  if (screen === 'availability') {
-    return (
-      <SafeAreaView style={styles.container}>
-        <ScrollView contentContainerStyle={styles.formPage}>
-          <TouchableOpacity onPress={() => setScreen('waiter')}>
-            <Text style={styles.back}>← Înapoi</Text>
-          </TouchableOpacity>
-
-          <Text style={styles.pageTitle}>Publică disponibilitatea</Text>
-
-          <Text style={{fontSize:16,color:"#6B7280",marginBottom:20}}>
-            Spune când poți lucra și ce tarif dorești pentru această postare.
-          </Text>
-          <Text style={{fontSize:16,fontWeight:"700",marginBottom:10}}>
-            Alege data sau datele
-          </Text>
-
-          <View style={{marginBottom:20,borderRadius:16,overflow:"hidden"}}>
-            <Calendar
-              minDate={new Date().toISOString().slice(0,10)}
-              firstDay={1}
-              onDayPress={(day) =>
-                setSelectedDates(prev =>
-                  prev.includes(day.dateString)
-                    ? prev.filter(x => x !== day.dateString)
-                    : [...prev, day.dateString]
-                )
-              }
-              markedDates={Object.fromEntries(
-                selectedDates.map(date => [
-                  date,
-                  {selected:true,selectedColor:"#111827"}
-                ])
-              )}
-            />
-          </View>
-
-
-          {selectedDates.length > 0 && (
-            <View style={{marginBottom:20}}>
-              <Text style={{fontSize:16,fontWeight:"700",marginBottom:10}}>
-                Interval orar
-              </Text>
-
-              {[...selectedDates].sort().map(date => {
-                const info = dayAvailability[date] || {};
-
-                return (
-                  <View
-                    key={date}
-                    style={{
-                      marginBottom:14,
-                      padding:14,
-                      borderWidth:1,
-                      borderColor:"#D1D5DB",
-                      borderRadius:16,
-                      backgroundColor:"#FFFFFF"
-                    }}
-                  >
-                    <Text style={{fontSize:16,fontWeight:"700",marginBottom:10}}>
-                      {new Date(date+"T12:00:00").toLocaleDateString("ro-RO",{
-                        weekday:"long",
-                        day:"numeric",
-                        month:"long"
-                      })}
-                    </Text>
-              <Text style={{fontWeight:"600",marginBottom:6}}>Tarif dorit (lei)</Text>
-          <TextInput placeholder="Tarif dorit (lei)" keyboardType="numeric" value={info.rate || ""} onChangeText={(value) => setDayAvailability(prev => ({...prev, [date]: {...(prev[date] || {}), rate: value}}))} style={styles.input} />
-
-                    <View style={{flexDirection:"row",gap:10}}>
-                      <View style={{flex:1,borderWidth:1,borderColor:"#D1D5DB",borderRadius:12,overflow:"hidden"}}>
-                        <Picker
-                          selectedValue={info.start || ""}
-                          onValueChange={(value) =>
-                            setDayAvailability(prev => ({
-                              ...prev,
-                              [date]: {...(prev[date] || {}), start:value}
-                            }))
-                          }
-                        >
-                          <Picker.Item label="De la" value="" />
-                          {Array.from({length:24},(_,h)=>{
-                            const ora=String(h).padStart(2,"0")+":00";
-                            return <Picker.Item key={ora} label={ora} value={ora} />;
-                          })}
-                        </Picker>
-                      </View>
-
-                      <View style={{flex:1,borderWidth:1,borderColor:"#D1D5DB",borderRadius:12,overflow:"hidden"}}>
-                        <Picker
-                          selectedValue={info.end || ""}
-                          onValueChange={(value) =>
-                            setDayAvailability(prev => ({
-                              ...prev,
-                              [date]: {...(prev[date] || {}), end:value}
-                            }))
-                          }
-                        >
-                          <Picker.Item label="Până la" value="" />
-                          {Array.from({length:24},(_,h)=>{
-                            const ora=String(h).padStart(2,"0")+":00";
-                            return <Picker.Item key={ora} label={ora} value={ora} />;
-                          })}
-                        </Picker>
-                      </View>
-                    </View>
-                  </View>
-                );
-              })}
-            </View>
-          )}
-
-          <TouchableOpacity onPress={publishAvailability} style={styles.primaryButton}>
-            <Text style={styles.primaryButtonText}>
-              Publică disponibilitatea
-            </Text>
-          </TouchableOpacity>
-        </ScrollView>
-      </SafeAreaView>
-    );
-  }
-
-  if (screen === 'waiter') {
-    return (
-      <SafeAreaView style={styles.container}>
-        <ScrollView contentContainerStyle={styles.formPage}>
-
-          <TouchableOpacity onPress={() => setScreen('home')}>
-            <Text style={styles.back}>← Înapoi</Text>
-          </TouchableOpacity>
-
-          <Text style={styles.pageTitle}>Profil ospătar</Text>
-
-          <Text style={styles.pageSubtitle}>
-            Completează datele tale pentru a găsi ture potrivite.
-          </Text>
-
-          <TextInput
-            placeholder="Nume complet"
-        value={fullName}
-        onChangeText={setFullName}
-            placeholderTextColor= "#8A8F98"
-            style={styles.input}
-          />
-<TextInput
-            placeholder="Oraș"
-        value={city}
-        onChangeText={setCity}
-            placeholderTextColor="#8A8F98"
-            style={styles.input}
-          />
-
-          <TextInput
-            placeholder="Ani de experiență"
-        value={experience}
-        onChangeText={setExperience}
-        placeholderTextColor="#9CA3AF"
-            keyboardType="numeric"
-            style={styles.input}
-          />
-
-      <Text style={{fontSize:16,fontWeight:"600",marginBottom:8,color:"#6B7280"}}>Experiență în</Text>
-      <View style={{flexDirection:"row",flexWrap:"wrap",gap:8,marginBottom:16}}>
-        {["Restaurant","Bar / Pub","Cafenea","Hotel","Evenimente (nunți, botezuri etc.)"].map((item)=>(
-          <TouchableOpacity key={item} onPress={()=>setWorkTypes(prev=>prev.includes(item)?prev.filter(x=>x!==item):[...prev,item])} style={{paddingVertical:10,paddingHorizontal:14,borderRadius:20,borderWidth:1,borderColor:workTypes.includes(item)?"#111827":"#D1D5DB",backgroundColor:workTypes.includes(item)?"#111827":"#FFFFFF"}}>
-            <Text style={{fontWeight:"600",color:workTypes.includes(item)?"#FFFFFF":"#111827"}}>{item}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      <Text style={{fontSize:16,fontWeight:"600",marginBottom:8,color:"#6B7280"}}>Competențe HoReCa</Text>
-      <View style={{flexDirection:"row",flexWrap:"wrap",gap:8,marginBottom:16}}>
-        {["Servire à la carte","POS / Casă de marcat","Servire băuturi","Preparare băuturi / Bar","Gestionare mese","Evenimente","Lucru în echipă"].map((item)=>(
-          <TouchableOpacity key={item} onPress={()=>setHorecaSkills(prev=>prev.includes(item)?prev.filter(x=>x!==item):[...prev,item])} style={{paddingVertical:10,paddingHorizontal:14,borderRadius:20,borderWidth:1,borderColor:horecaSkills.includes(item)?"#111827":"#D1D5DB",backgroundColor:horecaSkills.includes(item)?"#111827":"#FFFFFF"}}>
-            <Text style={{fontWeight:"600",color:horecaSkills.includes(item)?"#FFFFFF":"#111827"}}>{item}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-          <TextInput
-            placeholder="Descriere scurtă despre tine"
-        value={description}
-        onChangeText={setDescription}
-        placeholderTextColor="#9CA3AF"
-            multiline
-            style={[styles.input, styles.textArea]}
-          />
-
-          <TouchableOpacity onPress={saveProfile} style={styles.primaryButton}>
-            <Text style={styles.primaryButtonText}>
-              Salvează profilul
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={() => setScreen('availability')}
-            style={[styles.primaryButton,{marginTop:12}]}
-          >
-            <Text style={styles.primaryButtonText}>
-              Publică disponibilitatea
-            </Text>
-          </TouchableOpacity>
-
-        </ScrollView>
-      </SafeAreaView>
-    );
-  }
-
-  // ECRAN RESTAURANT / ANGAJATOR
-  // PROFIL MANAGER / LOCATIE
-  if (screen === "managerProfile") {
-    return (
-      <SafeAreaView style={styles.container}>
-        <ScrollView contentContainerStyle={styles.formPage}>
-          <Text style={styles.pageTitle}>Profil locație</Text>
-          <Text style={styles.pageSubtitle}>Completează datele locației tale</Text>
-
-          <TextInput
-            placeholder="Numele locației"
-            value={locationName}
-            onChangeText={setLocationName}
-            style={styles.input}
-          />
-
-          <TextInput
-            placeholder="Tip locație (Restaurant, Bar, Hotel...)"
-            value={locationType}
-            onChangeText={setLocationType}
-            style={styles.input}
-          />
-          <TextInput
-            placeholder="Oraș"
-            value={locationCity}
-            onChangeText={setLocationCity}
-            style={styles.input}
-          />
-
-          <TextInput
-            placeholder="Adresă / Zonă"
-            value={locationAddress}
-            onChangeText={setLocationAddress}
-            style={styles.input}
-          />
-
-          <TextInput
-            placeholder="Persoană de contact"
-            value={contactName}
-            onChangeText={setContactName}
-            style={styles.input}
-          />
-
-          <TextInput
-            placeholder="Telefon"
-            value={contactPhone}
-            onChangeText={setContactPhone}
-            keyboardType="phone-pad"
-            style={styles.input}
-          />
-        <TouchableOpacity onPress={saveManagerProfile} style={[styles.primaryButton,{marginTop:16}]}>
-          <Text style={styles.primaryButtonText}>Salvează profilul</Text>
-        </TouchableOpacity>
-
-        </ScrollView>
-      </SafeAreaView>
-    );
-  }
-
-  if (screen === 'employer') {
-    return (
-      <SafeAreaView style={styles.container}>
-        <ScrollView contentContainerStyle={styles.formPage}>
-
-          <TouchableOpacity onPress={() => setScreen('home')}>
-            <Text style={styles.back}>← Înapoi</Text>
-          </TouchableOpacity>
-
-          <Text style={styles.pageTitle}>
-            Publică o tură
-          </Text>
-
-          <Text style={styles.pageSubtitle}>
-            Spune de câți ospătari ai nevoie și când.
-          </Text>
-
-          <TextInput
-            placeholder="Numele restaurantului / locației"
-            style={styles.input}
-          />
-
-          <TextInput
-            placeholder="Oraș"
-            style={styles.input}
-          />
-
-          <TextInput
-            placeholder="Tip eveniment"
-            style={styles.input}
-          />
-
-          <TextInput
-            placeholder="Data evenimentului"
-            style={styles.input}
-          />
-
-          <TextInput
-            placeholder="Interval orar (ex: 16:00 - 02:00)"
-            style={styles.input}
-          />
-
-          <TextInput
-            placeholder="Număr ospătari necesari"
-            keyboardType="numeric"
-            style={styles.input}
-          />
-
-          <TextInput
-            placeholder="Plată / ospătar (lei)"
-            keyboardType="numeric"
-            style={styles.input}
-          />
-
-          <TextInput
-            placeholder="Detalii suplimentare"
-            multiline
-            style={[styles.input, styles.textArea]}
-          />
-
-          <TouchableOpacity onPress={publishAvailability} style={styles.primaryButton}>
-            <Text style={styles.primaryButtonText}>
-              Publică tura
-            </Text>
-          </TouchableOpacity>
-
-        </ScrollView>
-      </SafeAreaView>
-    );
-  }
-
-  if (authLoading) {
-    return (
-      <SafeAreaView style={{flex:1,justifyContent:'center',alignItems:'center'}}>
-        <Text>Se încarcă TuraX...</Text>
-      </SafeAreaView>
+      <Shell>
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+          <ActivityIndicator color={C.gold} size="large" />
+          <Text style={{ color: C.muted, marginTop: 14 }}>Se încarcă TuraX...</Text>
+        </View>
+      </Shell>
     );
   }
 
   if (!session) {
     return (
-      <SafeAreaView style={{flex:1,backgroundColor:'#F7F8FA'}}>
-        <ScrollView contentContainerStyle={{padding:24,paddingTop:60}}>
-          <Text style={{fontSize:34,fontWeight:'800',marginBottom:8}}>TuraX</Text>
-          <Text style={{fontSize:18,marginBottom:24}}>
-            {authMode === 'login' ? 'Autentificare' : 'Creează cont'}
-          </Text>
-{authMode === 'signup' && (
-  <>
-    <Text style={{fontWeight:'600',marginBottom:6}}>Nume complet</Text>
-    <TextInput
-      value={authName}
-      onChangeText={setAuthName}
-      placeholder="Nume și prenume"
-      style={styles.input}
-    />
-
-  </>
-)}
-
-<Text style={{fontWeight:'600',marginTop:18,marginBottom:6}}>Email</Text>
-<TextInput
-  value={authEmail}
-  onChangeText={setAuthEmail}
-  placeholder="email@exemplu.ro"
-  autoCapitalize="none"
-  keyboardType="email-address"
-  style={styles.input}
-/>
-
-<Text style={{fontWeight:'600',marginTop:14,marginBottom:6}}>Parolă</Text>
-<TextInput
-  value={authPassword}
-  onChangeText={setAuthPassword}
-  placeholder="Parola"
-  secureTextEntry
-  style={styles.input}
-/>
-
-{!!authMessage && (
-  <Text style={{marginTop:14}}>{authMessage}</Text>
-)}
-
-<TouchableOpacity
-  onPress={authMode==='login' ? handleLogin : handleSignUp}
-  style={[styles.primaryButton,{marginTop:22}]}
->
-  <Text style={styles.primaryButtonText}>
-    {authMode==='login' ? 'Intră în cont' : 'Creează cont'}
-  </Text>
-</TouchableOpacity>
-
-<TouchableOpacity
-  onPress={() => {
-    setAuthMessage('');
-    setAuthMode(authMode==='login' ? 'signup' : 'login');
-  }}
-  style={{marginTop:22}}
->
-  <Text style={{textAlign:'center',fontWeight:'600'}}>
-    {authMode==='login'
-      ? 'Nu ai cont? Creează unul'
-      : 'Ai deja cont? Autentifică-te'}
-  </Text>
-</TouchableOpacity>
-        </ScrollView>
-      </SafeAreaView>
+      <AuthScreen
+        authMode={authMode}
+        setAuthMode={setAuthMode}
+        email={authEmail}
+        setEmail={setAuthEmail}
+        password={authPassword}
+        setPassword={setAuthPassword}
+        name={authName}
+        setName={setAuthName}
+        showPassword={showAuthPassword}
+        setShowPassword={setShowAuthPassword}
+        rememberMe={rememberMe}
+        setRememberMe={setRememberMe}
+        message={authMessage}
+        busy={authBusy}
+        onLogin={handleLogin}
+        onSignup={handleSignup}
+        onResetPassword={resetPassword}
+      />
     );
   }
 
-  if (session && authRole === null) {
+  if (!role) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={{flex:1,justifyContent:"center",padding:24}}>
-          <Text style={{fontSize:30,fontWeight:"800",marginBottom:10}}>Alege rolul</Text>
-          <Text style={{fontSize:17,marginBottom:28}}>Cum vei folosi TuraX?</Text>
-          <TouchableOpacity onPress={() => { setAuthRole("waiter"); setScreen("waiter"); }} style={styles.primaryButton}>
-            <Text style={styles.primaryButtonText}>Sunt ospătar</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => { setAuthRole("manager"); setScreen("managerProfile"); }} style={[styles.primaryButton,{marginTop:14}]}>
-            <Text style={styles.primaryButtonText}>Sunt manager</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
+      <RoleScreen
+        error={dbError}
+        onBack={handleSignOut}
+        onChoose={chooseRole}
+      />
     );
   }
 
-  // ECRAN PRINCIPAL
+  if (screen === "waiterProfile") {
+    return (
+      <View style={{ flex: 1, backgroundColor: C.bg }}>
+        <WaiterProfileScreen
+          form={waiterForm}
+          setForm={setWaiterForm}
+          error={formError}
+          onBack={() => requestProfileBack("waiter")}
+          onSave={saveWaiterProfile}
+        />
+        <TuraXNotice notice={notice} />
+        <TuraXConfirm dialog={confirmDialog} onCancel={() => setConfirmDialog(null)} onConfirm={executeConfirm} />
+      </View>
+    );
+  }
+
+  if (screen === "managerProfile") {
+    return (
+      <View style={{ flex: 1, backgroundColor: C.bg }}>
+        <ManagerProfileScreen
+          form={managerForm}
+          setForm={setManagerForm}
+          error={formError}
+          onBack={() => requestProfileBack("manager")}
+          onSave={saveManagerProfile}
+        />
+        <TuraXNotice notice={notice} />
+        <TuraXConfirm dialog={confirmDialog} onCancel={() => setConfirmDialog(null)} onConfirm={executeConfirm} />
+      </View>
+    );
+  }
+
+  const appScreen = (
+    <View style={{ flex: 1, backgroundColor: C.bg }}>
+      {screen === "home" && (
+        <HomeScreen
+          role={role}
+          profile={profile}
+          shifts={
+            role === "waiter"
+              ? shifts.filter((shift) =>
+                  Array.isArray(profile?.worker_roles) &&
+                  profile.worker_roles.some(
+                    (workerRole) =>
+                      String(workerRole || "").trim().toLocaleLowerCase("ro-RO") ===
+                      String(shift.role || "").trim().toLocaleLowerCase("ro-RO")
+                  )
+                )
+              : shifts
+          }
+          availabilities={availabilities}
+          acceptedShifts={acceptedShifts}
+          myAvailabilities={myAvailabilities}
+          myApplications={myApplications}
+          unreadCount={unreadCount}
+          dbError={dbError}
+          dataLoading={dataLoading}
+          refreshing={refreshing}
+          onRefresh={refresh}
+          onNotifications={() => setScreen("notifications")}
+          onSeeShifts={() => setScreen("shifts")}
+          onPublish={() => setScreen("publish")}
+          onOpenShift={openShift}
+          onAvailableWaiters={() => setScreen("availableWaiters")}
+          onBrowseWaiters={openWaiterDirectory}
+          onMyActivity={() => setScreen("myActivity")}
+          onConfirmedShifts={() => setScreen("confirmedShifts")}
+        />
+      )}
+
+      {screen === "shifts" && (
+        <ShiftsScreen
+          role={role}
+          shifts={filteredShifts}
+          query={shiftQuery}
+          setQuery={setShiftQuery}
+          filter={shiftFilter}
+          setFilter={setShiftFilter}
+          favorites={favorites}
+          onFavorite={toggleFavorite}
+          onOpenShift={openShift}
+          refreshing={refreshing}
+          onRefresh={refresh}
+        />
+      )}
+
+      {screen === "publish" && (
+        role === "waiter" ? (
+          <AvailabilityScreen
+            selectedDates={selectedDates}
+            setSelectedDates={setSelectedDates}
+            dayAvailability={dayAvailability}
+            setDayAvailability={setDayAvailability}
+            error={availabilityError}
+            onPublish={publishAvailability}
+          />
+        ) : (
+          <PublishShiftScreen
+            form={shiftForm}
+            setForm={setShiftForm}
+            profile={profile}
+            error={publishError}
+            busy={publishBusy}
+            onPublish={publishShift}
+          />
+        )
+      )}
+
+      {screen === "messages" && (
+        <MessagesScreen
+          role={role}
+          conversations={conversations}
+          onOpen={openConversationFromList}
+        />
+      )}
+
+      {screen === "profile" && (
+        <ProfileScreen
+          role={role}
+          profile={profile}
+          shifts={shifts}
+          acceptedShifts={acceptedShifts}
+          onEdit={() => {
+            setProfileBackTarget("profile");
+            setScreen(role === "waiter" ? "waiterProfile" : "managerProfile");
+          }}
+          onNotifications={() => setScreen("notifications")}
+          onSignOut={handleSignOut}
+          onDeleteAccount={handleDeleteAccount}
+          deleteAccountBusy={deleteAccountBusy}
+          onChangePhoto={pickProfilePhoto}
+          photoBusy={photoBusy}
+          onOpenShifts={() => setScreen(role === "waiter" ? "myActivity" : "shifts")}
+        />
+      )}
+
+      {screen === "myActivity" && role === "waiter" && (
+        <MyWaiterActivityScreen
+          availabilities={myAvailabilities}
+          applications={myApplications}
+          onBack={() => setScreen("home")}
+          onWithdrawAvailability={withdrawAvailability}
+          onCancelApplication={cancelMyApplication}
+          onRateManager={(application, rating) =>
+            submitShiftRating({
+              shiftId: application.shift_id,
+              revieweeId: application?.shifts?.manager_id,
+              rating,
+            })
+          }
+          onOpenShift={(application) => application?.shifts && openShift(application.shifts, "myActivity")}
+        />
+      )}
+
+      {screen === "confirmedShifts" && role === "waiter" && (
+        <ConfirmedShiftsScreen
+          applications={myApplications}
+          onBack={() => setScreen("home")}
+          onOpenShift={(application) => application?.shifts && openShift(application.shifts, "confirmedShifts")}
+        />
+      )}
+
+      {screen === "waiterDirectory" && role === "manager" && (
+        <WaiterDirectoryScreen
+          rows={waiterDirectory}
+          loading={waiterDirectoryLoading}
+          error={waiterDirectoryError}
+          onBack={() => setScreen("home")}
+          onMessage={(r) => openConversation({ waiter: r })}
+          onOpenProfile={openWorkerPublicProfile}
+        />
+      )}
+
+      {screen === "workerProfile" && role === "manager" && (
+        <WorkerPublicProfileScreen
+          worker={selectedWorkerProfile}
+          loading={workerProfileLoading}
+          error={workerProfileError}
+          onBack={() => {
+            setSelectedWorkerProfile(null);
+            setWorkerProfileError("");
+            setScreen("waiterDirectory");
+          }}
+          onMessage={(w) =>
+            openConversation({
+              waiter: {
+                waiter_id: w.waiter_id || w.id,
+                waiter_name:
+                  w.waiter_name ||
+                  w.full_name ||
+                  "Profesionist HoReCa",
+                waiter_avatar_url:
+                  w.waiter_avatar_url ||
+                  w.avatar_url ||
+                  null,
+              },
+            })
+          }
+        />
+      )}
+
+      {screen === "availableWaiters" && (
+        <AvailableWaitersScreen
+          rows={availabilities}
+          onBack={() => setScreen("home")}
+          onMessage={(r) =>
+            openConversation({
+              waiter: { waiter_id: r.waiter_id, waiter_name: r.waiter_name, waiter_avatar_url: r.waiter_avatar_url },
+            })
+          }
+        />
+      )}
+
+      {screen === "shiftDetail" && (
+        <ShiftDetailScreen
+          role={role}
+          shift={selectedShift}
+          applications={applications}
+          favorite={selectedShift ? favorites.includes(selectedShift.id) : false}
+          onBack={() => setScreen(shiftBackTarget)}
+          onFavorite={() => selectedShift && toggleFavorite(selectedShift.id)}
+          currentApplication={selectedShift ? myApplications.find((a) => a.shift_id === selectedShift.id) || null : null}
+          onApply={applyToShift}
+          applyBusy={applyBusy}
+          onMessage={() => openConversation({ shift: selectedShift })}
+          onApplicationStatus={updateApplication}
+          onCancelShift={cancelShiftByManager}
+          onAttendance={markAttendance}
+          onRateApplicant={(application, rating) =>
+            submitShiftRating({
+              shiftId: application.shift_id,
+              revieweeId: application.waiter_id,
+              rating,
+            })
+          }
+          onMessageApplicant={(a) => openConversation({ waiter: a })}
+        />
+      )}
+
+      {screen === "notifications" && (
+        <NotificationsScreen
+          notifications={notifications}
+          onBack={() => setScreen("home")}
+          onOpen={openNotification}
+        />
+      )}
+
+      {screen === "chat" && (
+        <ChatScreen
+          role={role}
+          conversation={chatConversation}
+          messages={chatMessages}
+          currentUserId={currentUserId}
+          text={chatText}
+          setText={setChatText}
+          onBack={() => setScreen("messages")}
+          onSend={sendMessage}
+        />
+      )}
+
+      {!["availableWaiters", "waiterDirectory", "workerProfile", "confirmedShifts", "myActivity", "shiftDetail", "notifications", "chat"].includes(screen) && (
+        <BottomNav screen={screen} setScreen={setScreen} />
+      )}
+      <TuraXNotice notice={notice} />
+      <TuraXConfirm
+        dialog={confirmDialog}
+        onCancel={() => setConfirmDialog(null)}
+        onConfirm={executeConfirm}
+      />
+    </View>
+  );
+
+  return appScreen;
+}
+
+function AuthScreen({
+  authMode,
+  setAuthMode,
+  email,
+  setEmail,
+  password,
+  setPassword,
+  name,
+  setName,
+  showPassword,
+  setShowPassword,
+  rememberMe,
+  setRememberMe,
+  message,
+  busy,
+  onLogin,
+  onSignup,
+  onResetPassword,
+}) {
+  const login = authMode === "login";
   return (
-    <SafeAreaView style={styles.container}>
+    <Shell>
+      <ScreenScroll bottom={40}>
+        <View style={{ alignItems: "center", marginTop: 10 }}>
+          <ClocheLogo size={205} />
+          <Text style={{ color: C.text, fontSize: 44, fontWeight: "900", marginTop: 8 }}>
+            Tura<Text style={{ color: C.gold }}>X</Text>
+          </Text>
+          <Text style={{ color: C.muted, fontSize: 16, marginTop: 4 }}>
+            Ture <Text style={{ color: C.gold }}>HoReCa</Text>, când vrei tu.
+          </Text>
+        </View>
 
-      <View style={styles.header}>
-        <Text style={styles.logo}>TuraX</Text>
+        <View style={{ marginTop: 30 }}>
+          <Text style={{ color: C.text, fontSize: 28, fontWeight: "900", textAlign: "center" }}>
+            {login ? "Autentificare" : "Creează cont"}
+          </Text>
 
-        <Text style={styles.subtitle}>
-          Găsește ture. Găsește oameni.
-        </Text>
-      </View>
+          {!login && (
+            <Field label="Nume" icon="person-outline" value={name} onChangeText={setName} placeholder="Numele tău" />
+          )}
 
-      <View style={styles.content}>
-
-        <Text style={styles.welcome}>
-          Bun venit! 👋
-        </Text>
-
-        <Text style={styles.question}>
-          Ce vrei să faci astăzi?
-        </Text>
-
-        <TouchableOpacity
-          style={styles.waiterButton}
-          onPress={() => setScreen('waiter')}
-        >
-          <Text style={styles.icon}>👨‍🍳</Text>
-
-          <View style={styles.buttonContent}>
-            <Text style={styles.buttonTitleDark}>
-              Sunt ospătar
-            </Text>
-
-            <Text style={styles.buttonTextDark}>
-              Caut evenimente și ture suplimentare
-            </Text>
+          <View style={{ marginTop: 20 }}>
+            <Field label="Email" icon="mail-outline" value={email} onChangeText={setEmail} placeholder="email@exemplu.ro" keyboardType="email-address" autoCapitalize="none" />
+            <Field
+              label="Parolă"
+              icon="lock-closed-outline"
+              value={password}
+              onChangeText={setPassword}
+              placeholder="Parolă"
+              secureTextEntry={!showPassword}
+              autoCapitalize="none"
+              right={
+                <TouchableOpacity onPress={() => setShowPassword((v) => !v)}>
+                  <Ionicons name={showPassword ? "eye-off-outline" : "eye-outline"} size={24} color={C.gold} />
+                </TouchableOpacity>
+              }
+            />
           </View>
-        </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.restaurantButton}
-          onPress={() => setScreen('employer')}
-        >
-          <Text style={styles.icon}>🏨</Text>
+          {login && (
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 15 }}>
+              <TouchableOpacity onPress={() => setRememberMe((v) => !v)} style={{ flexDirection: "row", alignItems: "center", paddingVertical: 6 }}>
+                <View style={{ width: 21, height: 21, borderRadius: 6, borderWidth: 1, borderColor: rememberMe ? C.gold : C.border, backgroundColor: rememberMe ? C.gold : C.panel, alignItems: "center", justifyContent: "center", marginRight: 8 }}>
+                  {rememberMe && <Ionicons name="checkmark" size={15} color="#07111D" />}
+                </View>
+                <Text style={{ color: C.muted }}>Ține-mă minte</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={onResetPassword}><Text style={{ color: C.gold }}>Ai uitat parola?</Text></TouchableOpacity>
+            </View>
+          )}
 
-          <View style={styles.buttonContent}>
-            <Text style={styles.buttonTitleLight}>
-              Sunt restaurant / angajator
+          <ErrorBox text={message} />
+          <Button label={busy ? "Se procesează..." : login ? "Autentificare" : "Creează cont"} onPress={login ? onLogin : onSignup} disabled={busy} icon={login ? "log-in-outline" : "person-add-outline"} />
+
+          <TouchableOpacity onPress={() => setAuthMode(login ? "signup" : "login")} style={{ paddingVertical: 20, alignItems: "center" }}>
+            <Text style={{ color: C.muted }}>
+              {login ? "Nu ai cont? " : "Ai deja cont? "}
+              <Text style={{ color: C.gold, fontWeight: "800" }}>{login ? "Creează unul" : "Autentifică-te"}</Text>
             </Text>
-
-            <Text style={styles.buttonTextLight}>
-              Caut ospătari pentru ture și evenimente
-            </Text>
-          </View>
-        </TouchableOpacity>
-
-        <Text style={styles.info}>
-          TuraX conectează ospătarii disponibili cu restaurantele
-          care au nevoie de oameni.
-        </Text>
-
-      </View>
-
-    </SafeAreaView>
+          </TouchableOpacity>
+          <Text style={{ color: C.muted2, fontSize: 12, textAlign: "center", marginTop: 8 }}>🔐 Nu stocăm parola în aplicație.</Text>
+        </View>
+      </ScreenScroll>
+    </Shell>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F7F8FA',
-  },
+function RoleScreen({ onBack, onChoose, error }) {
+  return (
+    <Shell>
+      <ScreenScroll bottom={36}>
+        <BackButton onPress={onBack} />
 
-  header: {
-    backgroundColor: '#111827',
-    paddingTop: 35,
-    paddingBottom: 30,
-    paddingHorizontal: 25,
-    borderBottomLeftRadius: 25,
-    borderBottomRightRadius: 25,
-  },
+        <View style={{ alignItems: "center" }}>
+          <ClocheLogo size={220} />
+          <Text style={{ color: C.text, fontSize: 36, fontWeight: "900", textAlign: "center", marginTop: 10 }}>
+            Bun venit! 👋
+          </Text>
+          <Text style={{ color: C.muted, fontSize: 18, textAlign: "center", marginTop: 9 }}>
+            Alege <Text style={{ color: C.gold, fontWeight: "800" }}>tipul de cont</Text> potrivit pentru tine
+          </Text>
+        </View>
 
-  logo: {
-    color: '#FFFFFF',
-    fontSize: 36,
-    fontWeight: '800',
-    textAlign: 'center',
-  },
+        <View style={{ marginTop: 28 }}>
+          <ErrorBox text={error} />
+          <TouchableOpacity
+            onPress={() => onChoose("waiter")}
+            style={{
+              minHeight: 110,
+              borderRadius: 22,
+              borderWidth: 1,
+              borderColor: C.border,
+              backgroundColor: C.panel2,
+              padding: 18,
+              flexDirection: "row",
+              alignItems: "center",
+            }}
+          >
+            <View style={{ width: 58, height: 58, borderRadius: 17, backgroundColor: C.panel3, alignItems: "center", justifyContent: "center", marginRight: 15 }}>
+              <Ionicons name="person-outline" size={30} color={C.gold} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: C.text, fontSize: 20, fontWeight: "900" }}>Lucrez în HoReCa</Text>
+              <Text style={{ color: C.muted, marginTop: 5, lineHeight: 19 }}>
+                Găsesc ture potrivite rolurilor mele
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={26} color={C.gold} />
+          </TouchableOpacity>
 
-  subtitle: {
-    color: '#D1D5DB',
-    fontSize: 16,
-    textAlign: 'center',
-    marginTop: 5,
-  },
+          <TouchableOpacity
+            onPress={() => onChoose("manager")}
+            style={{
+              minHeight: 110,
+              borderRadius: 22,
+              backgroundColor: C.gold,
+              padding: 18,
+              flexDirection: "row",
+              alignItems: "center",
+              marginTop: 14,
+            }}
+          >
+            <View style={{ width: 58, height: 58, borderRadius: 17, backgroundColor: C.bg, alignItems: "center", justifyContent: "center", marginRight: 15 }}>
+              <Ionicons name="business-outline" size={29} color={C.gold} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: "#07111D", fontSize: 19, fontWeight: "900" }}>
+                Restaurant / Angajator
+              </Text>
+              <Text style={{ color: "#42382A", marginTop: 5, lineHeight: 19 }}>
+                Public ture și găsesc oameni disponibili
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={26} color="#07111D" />
+          </TouchableOpacity>
+        </View>
+      </ScreenScroll>
+    </Shell>
+  );
+}
 
-  content: {
-    flex: 1,
-    padding: 24,
-    justifyContent: 'center',
-  },
+function WaiterProfileScreen({ form, setForm, error, onBack, onSave }) {
+  const toggle = (key, item) =>
+    setForm((prev) => ({
+      ...prev,
+      [key]: prev[key].includes(item)
+        ? prev[key].filter((x) => x !== item)
+        : [...prev[key], item],
+    }));
 
-  welcome: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#111827',
-    textAlign: 'center',
-    marginBottom: 10,
-  },
+  const toggleCustomRole = () =>
+    setForm((prev) => ({
+      ...prev,
+      customRoleEnabled: !prev.customRoleEnabled,
+      customWorkerRole: prev.customRoleEnabled ? "" : prev.customWorkerRole,
+    }));
 
-  question: {
-    fontSize: 18,
-    color: '#4B5563',
-    textAlign: 'center',
-    marginBottom: 30,
-  },
+  return (
+    <Shell>
+      <ScreenScroll bottom={42}>
+        <BackButton onPress={onBack} />
 
-  waiterButton: {
-    backgroundColor: '#FFFFFF',
-    padding: 20,
-    borderRadius: 18,
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
+        <Title subtitle="Completează profilul profesional pentru a găsi ture potrivite rolurilor și experienței tale.">
+          Profil profesionist HoReCa
+        </Title>
 
-  restaurantButton: {
-    backgroundColor: '#111827',
-    padding: 20,
-    borderRadius: 18,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
+        <ErrorBox text={error} />
 
-  icon: {
-    fontSize: 38,
-    marginRight: 16,
-  },
+        <Text style={{ color: C.gold, fontSize: 17, fontWeight: "900", marginBottom: 12 }}>
+          Date personale
+        </Text>
 
-  buttonContent: {
-    flex: 1,
-  },
+        <Field
+          icon="person-outline"
+          value={form.fullName}
+          onChangeText={(v) => setForm((p) => ({ ...p, fullName: v }))}
+          placeholder="Nume complet *"
+        />
 
-  buttonTitleDark: {
-    fontSize: 19,
-    fontWeight: '800',
-    color: '#111827',
-    marginBottom: 5,
-  },
+        <Field
+          icon="location-outline"
+          value={form.city}
+          onChangeText={(v) => setForm((p) => ({ ...p, city: v }))}
+          placeholder="Oraș *"
+        />
 
-  buttonTextDark: {
-    fontSize: 14,
-    color: '#6B7280',
-    lineHeight: 20,
-  },
+        <Field
+          icon="briefcase-outline"
+          value={form.experience}
+          onChangeText={(v) => setForm((p) => ({ ...p, experience: v }))}
+          placeholder="Ani de experiență *"
+          keyboardType="numeric"
+        />
 
-  buttonTitleLight: {
-    fontSize: 19,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    marginBottom: 5,
-  },
+        <Text style={{ color: C.text, fontSize: 18, fontWeight: "900", marginTop: 13, marginBottom: 6 }}>
+          În ce roluri poți lucra? *
+        </Text>
 
-  buttonTextLight: {
-    fontSize: 14,
-    color: '#D1D5DB',
-    lineHeight: 20,
-  },
+        <Text style={{ color: C.muted, fontSize: 13, lineHeight: 19, marginBottom: 12 }}>
+          Poți selecta mai multe roluri.
+        </Text>
 
-  info: {
-    textAlign: 'center',
-    color: '#6B7280',
-    fontSize: 14,
-    lineHeight: 21,
-    marginTop: 30,
-    paddingHorizontal: 15,
-  },
+        <View style={{ flexDirection: "row", flexWrap: "wrap", marginBottom: 6 }}>
+          {WORKER_ROLES.map((item) => (
+            <Chip
+              key={item}
+              label={item}
+              selected={form.workerRoles.includes(item)}
+              onPress={() => toggle("workerRoles", item)}
+            />
+          ))}
 
-  formPage: {
-    padding: 24,
-    paddingBottom: 50,
-  },
+          <Chip
+            label="Alte roluri"
+            selected={form.customRoleEnabled}
+            onPress={toggleCustomRole}
+          />
+        </View>
 
-  back: {
-    fontSize: 17,
-    color: '#111827',
-    marginBottom: 25,
-    marginTop: 10,
-  },
+        {form.customRoleEnabled && (
+          <View style={{ marginBottom: 12 }}>
+            <Field
+              label="Specifică rolul *"
+              icon="briefcase-outline"
+              value={form.customWorkerRole}
+              onChangeText={(v) =>
+                setForm((p) => ({ ...p, customWorkerRole: v }))
+              }
+              placeholder="Ex: Personal curățenie, Steward / Spălător vase"
+            />
 
-  pageTitle: {
-    fontSize: 30,
-    fontWeight: '800',
-    color: '#111827',
-    marginBottom: 8,
-  },
+            <Text style={{ color: C.muted, fontSize: 12, lineHeight: 18, marginTop: -5 }}>
+              Rolul introdus aici va fi folosit pentru potrivirea cu turele publicate.
+            </Text>
+          </View>
+        )}
 
-  pageSubtitle: {
-    fontSize: 15,
-    color: '#6B7280',
-    marginBottom: 25,
-    lineHeight: 21,
-  },
+        <Text style={{ color: C.text, fontSize: 18, fontWeight: "900", marginTop: 13, marginBottom: 12 }}>
+          Experiență în *
+        </Text>
 
-  input: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 14,
-    paddingHorizontal: 16,
-    paddingVertical: 15,
-    fontSize: 16,
-    marginBottom: 14,
-  },
+        <View style={{ flexDirection: "row", flexWrap: "wrap", marginBottom: 15 }}>
+          {WORK_TYPES.map((item) => (
+            <Chip
+              key={item}
+              label={item}
+              selected={form.workTypes.includes(item)}
+              onPress={() => toggle("workTypes", item)}
+            />
+          ))}
+        </View>
 
-  textArea: {
-    minHeight: 100,
-    textAlignVertical: 'top',
-  },
+        <Text style={{ color: C.text, fontSize: 18, fontWeight: "900", marginBottom: 12 }}>
+          Competențe HoReCa *
+        </Text>
 
-  primaryButton: {
-    backgroundColor: '#111827',
-    paddingVertical: 17,
-    borderRadius: 14,
-    marginTop: 10,
-  },
+        <View style={{ flexDirection: "row", flexWrap: "wrap", marginBottom: 15 }}>
+          {SKILLS.map((item) => (
+            <Chip
+              key={item}
+              label={item}
+              selected={form.horecaSkills.includes(item)}
+              onPress={() => toggle("horecaSkills", item)}
+            />
+          ))}
+        </View>
 
-  primaryButtonText: {
-    color: '#FFFFFF',
-    textAlign: 'center',
-    fontSize: 17,
-    fontWeight: '700',
-  },
-});
+        <Text style={{ color: C.text, fontSize: 18, fontWeight: "900", marginBottom: 12 }}>
+          Despre tine
+        </Text>
+
+        <Field
+          value={form.description}
+          onChangeText={(v) => setForm((p) => ({ ...p, description: v }))}
+          placeholder="Descriere scurtă despre tine"
+          multiline
+        />
+
+        <Button
+          label="Salvează profilul"
+          icon="checkmark-circle-outline"
+          onPress={onSave}
+          style={{ marginTop: 8 }}
+        />
+      </ScreenScroll>
+    </Shell>
+  );
+}
+
+function ManagerProfileScreen({ form, setForm, error, onBack, onSave }) {
+  return (
+    <Shell>
+      <ScreenScroll bottom={42}>
+        <BackButton onPress={onBack} />
+        <Title subtitle="Datele locației apar în turele publicate și ajută profesioniștii HoReCa să știe unde aplică.">Profil locație</Title>
+        <ErrorBox text={error} />
+        <Field label="Nume locație *" icon="business-outline" value={form.locationName} onChangeText={(v) => setForm((p) => ({ ...p, locationName: v }))} placeholder="Ex: Restaurant X" />
+        <Field label="Tip locație *" icon="restaurant-outline" value={form.locationType} onChangeText={(v) => setForm((p) => ({ ...p, locationType: v }))} placeholder="Ex: Fine dining" />
+        <Field label="Oraș *" icon="location-outline" value={form.locationCity} onChangeText={(v) => setForm((p) => ({ ...p, locationCity: v }))} placeholder="Oraș" />
+        <Field label="Adresă / Zonă *" icon="map-outline" value={form.locationAddress} onChangeText={(v) => setForm((p) => ({ ...p, locationAddress: v }))} placeholder="Stradă, număr sau zonă" />
+        <Field label="Persoană de contact *" icon="person-outline" value={form.contactName} onChangeText={(v) => setForm((p) => ({ ...p, contactName: v }))} placeholder="Nume contact" />
+        <Field label="Telefon *" icon="call-outline" value={form.contactPhone} onChangeText={(v) => setForm((p) => ({ ...p, contactPhone: v }))} placeholder="07..." keyboardType="phone-pad" />
+        <Button label="Salvează profilul" icon="checkmark-circle-outline" onPress={onSave} style={{ marginTop: 8 }} />
+      </ScreenScroll>
+    </Shell>
+  );
+}
+
+function HomeScreen({
+  role,
+  profile,
+  shifts,
+  availabilities,
+  acceptedShifts,
+  myAvailabilities,
+  myApplications,
+  unreadCount,
+  dbError,
+  dataLoading,
+  refreshing,
+  onRefresh,
+  onNotifications,
+  onSeeShifts,
+  onPublish,
+  onOpenShift,
+  onAvailableWaiters,
+  onBrowseWaiters,
+  onMyActivity,
+  onConfirmedShifts,
+}) {
+  const manager = role === "manager";
+  const firstName = manager ? profile?.location_name || "TuraX" : (profile?.full_name || "Salut").split(" ")[0];
+  const activeManagerShifts = shifts.filter((s) => ["open", "closed"].includes(s.status) && !hasShiftEnded(s));
+  const primaryCount = manager ? activeManagerShifts.length : shifts.length;
+  const secondaryCount = manager ? new Set(availabilities.map((a) => a.waiter_id).filter(Boolean)).size : acceptedShifts.filter((a) => a.status === "accepted").length;
+
+  return (
+    <Shell>
+      <ScreenScroll refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.gold} />} bottom={110}>
+        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+          <View>
+            <Text style={{ color: C.gold, fontSize: 34, fontWeight: "900" }}>TuraX</Text>
+            <Text style={{ color: C.muted, marginTop: 2 }}>Ture HoReCa, când vrei tu.</Text>
+          </View>
+          <TouchableOpacity onPress={onNotifications} style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: C.panel2, borderWidth: 1, borderColor: C.border, alignItems: "center", justifyContent: "center" }}>
+            <Ionicons name="notifications-outline" size={23} color={C.gold} />
+            {unreadCount > 0 && (
+              <View style={{ position: "absolute", top: -3, right: -3, minWidth: 19, height: 19, borderRadius: 10, backgroundColor: C.danger, alignItems: "center", justifyContent: "center", paddingHorizontal: 4 }}>
+                <Text style={{ color: "#fff", fontSize: 10, fontWeight: "900" }}>{unreadCount > 9 ? "9+" : unreadCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
+
+        <Text style={{ color: C.text, fontSize: 27, fontWeight: "900", marginTop: 30 }}>{manager ? `Bun venit, ${firstName}` : `Salut, ${firstName}! 👋`}</Text>
+        <Text style={{ color: C.muted, marginTop: 6, lineHeight: 20 }}>{manager ? "Gestionează turele și găsește oameni disponibili." : "Găsește ture potrivite și gestionează programul tău."}</Text>
+        <ErrorBox text={dbError} />
+
+        <View style={{ flexDirection: "row", marginTop: 22 }}>
+          <TouchableOpacity onPress={onSeeShifts} activeOpacity={0.82} style={{ flex: 1, backgroundColor: C.panel2, borderRadius: 18, borderWidth: 1, borderColor: C.border, padding: 16, marginRight: 8 }}>
+            <Text style={{ color: C.gold, fontSize: 25, fontWeight: "900" }}>{primaryCount}</Text>
+            <Text style={{ color: C.muted, fontSize: 12, marginTop: 4 }}>{manager ? "Ture active" : "Ture disponibile"}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={manager ? onAvailableWaiters : onConfirmedShifts} activeOpacity={0.82} style={{ flex: 1, backgroundColor: C.panel2, borderRadius: 18, borderWidth: 1, borderColor: C.border, padding: 16, marginLeft: 8 }}>
+            <Text style={{ color: C.gold, fontSize: 25, fontWeight: "900" }}>{secondaryCount}</Text>
+            <Text style={{ color: C.muted, fontSize: 12, marginTop: 4 }}>{manager ? "Oameni disponibili" : "Ture confirmate"}</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={{ flexDirection: "row", marginTop: 14 }}>
+          <Button label={manager ? "Publică tură" : "Publică disponibilitate"} icon="add-circle-outline" onPress={onPublish} style={{ flex: 1, marginRight: 7 }} />
+          <Button label={manager ? "Vezi oameni" : "Vezi ture"} icon="search-outline" onPress={manager ? onBrowseWaiters : onSeeShifts} secondary style={{ flex: 1, marginLeft: 7 }} />
+        </View>
+
+        {!manager && (
+          <TouchableOpacity onPress={onMyActivity} activeOpacity={0.85} style={{ marginTop: 12, minHeight: 70, borderRadius: 17, borderWidth: 1, borderColor: C.border, backgroundColor: C.panel, flexDirection: "row", alignItems: "center", paddingHorizontal: 15 }}>
+            <Ionicons name="calendar-outline" size={23} color={C.gold} style={{ marginRight: 12 }} />
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: C.text, fontSize: 16, fontWeight: "900" }}>Programul meu</Text>
+              <Text style={{ color: C.muted, fontSize: 13, marginTop: 3 }}>{myAvailabilities.length} disponibilități · {myApplications.length} candidaturi</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={C.gold} />
+          </TouchableOpacity>
+        )}
+
+        <Text style={{ color: C.text, fontSize: 20, fontWeight: "900", marginTop: 28, marginBottom: 13 }}>{manager ? "Turele tale" : "Ture recomandate"}</Text>
+        {dataLoading ? (
+          <ActivityIndicator color={C.gold} />
+        ) : shifts.length === 0 ? (
+          <EmptyCard title={manager ? "Nu ai publicat nicio tură" : "Nu există ture publicate încă"} text={manager ? "Publică prima tură când ai nevoie de personal." : "Când apar ture noi, le vei vedea aici."} />
+        ) : (
+          shifts.slice(0, 3).map((s) => <ShiftCard key={s.id} shift={s} showStatus={manager} onPress={() => onOpenShift(s)} />)
+        )}
+      </ScreenScroll>
+    </Shell>
+  );
+}
+
+function ShiftsScreen({ role, shifts, query, setQuery, filter, setFilter, favorites, onFavorite, onOpenShift, refreshing, onRefresh }) {
+  const filterItems = role === "waiter" ? ["Toate", "Azi", "Mâine", "Weekend", "Favorite"] : ["Toate", "Active", "Ocupate", "Finalizate", "Anulate"];
+  return (
+    <Shell>
+      <ScreenScroll refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.gold} />} bottom={110}>
+        <Title subtitle={role === "waiter" ? "Caută după locație, oraș sau rol." : "Turele publicate de locația ta."}>{role === "waiter" ? "Ture disponibile" : "Turele mele"}</Title>
+        <Field icon="search-outline" value={query} onChangeText={setQuery} placeholder="Caută..." />
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }} keyboardShouldPersistTaps="handled">
+          {filterItems.map((x) => <Chip key={x} label={x} selected={filter === x} onPress={() => setFilter(x)} />)}
+        </ScrollView>
+        {shifts.length === 0 ? (
+          <EmptyCard title="Nicio tură găsită" text="Încearcă alt filtru sau revino mai târziu." />
+        ) : (
+          shifts.map((s) => (
+            <ShiftCard key={s.id} shift={s} showStatus={role === "manager"} favorite={favorites.includes(s.id)} onFavorite={role === "waiter" ? () => onFavorite(s.id) : null} onPress={() => onOpenShift(s)} />
+          ))
+        )}
+      </ScreenScroll>
+    </Shell>
+  );
+}
+
+// TURAX_HOTFIX_PICKER_3_1_2_1
+function PickerBox({ value, onChange, placeholder, items }) {
+  const [visible, setVisible] = useState(false);
+
+  const choose = (item) => {
+    onChange(item);
+    setVisible(false);
+  };
+
+  return (
+    <>
+      <TouchableOpacity
+        onPress={() => setVisible(true)}
+        activeOpacity={0.82}
+        style={{
+          flex: 1,
+          minHeight: 56,
+          borderRadius: 14,
+          borderWidth: 1,
+          borderColor: C.border,
+          backgroundColor: C.panel,
+          paddingHorizontal: 14,
+          flexDirection: "row",
+          alignItems: "center",
+        }}
+      >
+        <Text
+          style={{
+            color: value ? C.text : C.muted2,
+            fontSize: 16,
+            flex: 1,
+          }}
+        >
+          {value || placeholder}
+        </Text>
+        <Ionicons name="chevron-down" size={19} color={C.gold} />
+      </TouchableOpacity>
+
+      <Modal
+        transparent
+        visible={visible}
+        animationType="fade"
+        onRequestClose={() => setVisible(false)}
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.78)",
+            justifyContent: "center",
+            paddingHorizontal: 22,
+          }}
+        >
+          <View
+            style={{
+              maxHeight: "72%",
+              borderRadius: 22,
+              backgroundColor: C.panel2,
+              borderWidth: 1,
+              borderColor: C.gold,
+              overflow: "hidden",
+            }}
+          >
+            <View
+              style={{
+                paddingHorizontal: 18,
+                paddingVertical: 16,
+                borderBottomWidth: 1,
+                borderBottomColor: C.border,
+                flexDirection: "row",
+                alignItems: "center",
+              }}
+            >
+              <Text
+                style={{
+                  color: C.text,
+                  fontSize: 19,
+                  fontWeight: "900",
+                  flex: 1,
+                }}
+              >
+                {placeholder}
+              </Text>
+
+              <TouchableOpacity
+                onPress={() => setVisible(false)}
+                style={{
+                  width: 38,
+                  height: 38,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Ionicons name="close" size={25} color={C.gold} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {items.map((item) => {
+                const selected = item === value;
+
+                return (
+                  <TouchableOpacity
+                    key={item}
+                    onPress={() => choose(item)}
+                    activeOpacity={0.82}
+                    style={{
+                      minHeight: 60,
+                      paddingHorizontal: 18,
+                      flexDirection: "row",
+                      alignItems: "center",
+                      borderBottomWidth: 1,
+                      borderBottomColor: C.border,
+                      backgroundColor: selected ? C.panel3 : C.panel2,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: selected ? C.gold : C.text,
+                        fontSize: 17,
+                        fontWeight: selected ? "900" : "600",
+                        flex: 1,
+                      }}
+                    >
+                      {item}
+                    </Text>
+
+                    {selected && (
+                      <Ionicons
+                        name="checkmark-circle"
+                        size={23}
+                        color={C.gold}
+                      />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+    </>
+  );
+}
+
+function TimePickerBox({ value, onChange, placeholder, disabledTimes = [] }) {
+  const [visible, setVisible] = useState(false);
+  return (
+    <>
+      <TouchableOpacity
+        onPress={() => setVisible(true)}
+        activeOpacity={0.82}
+        style={{ minHeight: 56, borderRadius: 14, borderWidth: 1, borderColor: C.border, backgroundColor: C.panel, paddingHorizontal: 14, flexDirection: "row", alignItems: "center" }}
+      >
+        <Text style={{ color: value ? C.text : C.muted2, fontSize: 16, flex: 1 }}>{value || placeholder}</Text>
+        <Ionicons name="chevron-down" size={19} color={C.gold} />
+      </TouchableOpacity>
+
+      <Modal transparent visible={visible} animationType="fade" onRequestClose={() => setVisible(false)}>
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.72)", justifyContent: "center", paddingHorizontal: 22 }}>
+          <View style={{ maxHeight: "72%", borderRadius: 22, backgroundColor: C.panel2, borderWidth: 1, borderColor: C.gold, overflow: "hidden" }}>
+            <View style={{ paddingHorizontal: 18, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: C.border, flexDirection: "row", alignItems: "center" }}>
+              <Text style={{ color: C.text, fontSize: 19, fontWeight: "900", flex: 1 }}>{placeholder}</Text>
+              <TouchableOpacity onPress={() => setVisible(false)} style={{ padding: 5 }}><Ionicons name="close" size={24} color={C.gold} /></TouchableOpacity>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              {(placeholder === "Început"
+          ? TIME_SLOTS.filter((item) => item >= "07:00")
+          : TIME_SLOTS
+        ).map((item) => {
+                const selected = item === value;
+                const disabled = disabledTimes.includes(item);
+                return (
+                  <TouchableOpacity key={item} disabled={disabled} onPress={() => { onChange(item); setVisible(false); }} style={{ minHeight: 52, paddingHorizontal: 20, flexDirection: "row", alignItems: "center", borderBottomWidth: 1, borderBottomColor: C.border, backgroundColor: selected ? C.panel3 : C.panel2, opacity: disabled ? 0.32 : 1 }}>
+                    <Text style={{ color: selected ? C.gold : C.text, fontSize: 17, fontWeight: selected ? "900" : "600", flex: 1 }}>{item}</Text>
+                    {disabled ? <Text style={{ color: C.muted2, fontSize: 12 }}>prea devreme</Text> : selected ? <Ionicons name="checkmark-circle" size={21} color={C.gold} /> : null}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+    </>
+  );
+}
+
+function DarkCalendar({ selectedDates, onDayPress, single }) {
+  const marked = Object.fromEntries(
+    selectedDates.map((date) => [date, { selected: true, selectedColor: C.gold, selectedTextColor: "#07111D" }])
+  );
+  return (
+    <View style={{ borderRadius: 18, overflow: "hidden", borderWidth: 1, borderColor: C.border }}>
+      <Calendar
+        minDate={todayIso()}
+        firstDay={1}
+        onDayPress={onDayPress}
+        markedDates={marked}
+        theme={{
+          calendarBackground: C.panel,
+          dayTextColor: C.text,
+          monthTextColor: C.text,
+          textDisabledColor: "#405069",
+          todayTextColor: C.gold,
+          arrowColor: C.gold,
+          selectedDayBackgroundColor: C.gold,
+          selectedDayTextColor: "#07111D",
+          textSectionTitleColor: C.muted,
+        }}
+      />
+    </View>
+  );
+}
+
+function AvailabilityScreen({ selectedDates, setSelectedDates, dayAvailability, setDayAvailability, error, onPublish }) {
+  return (
+    <Shell>
+      <ScreenScroll bottom={112}>
+        <Title subtitle="Alege zilele, intervalul și tariful dorit.">Publică disponibilitatea</Title>
+
+        <DarkCalendar
+          selectedDates={selectedDates}
+          onDayPress={(day) =>
+            setSelectedDates((prev) =>
+              prev.includes(day.dateString) ? prev.filter((x) => x !== day.dateString) : [...prev, day.dateString]
+            )
+          }
+        />
+
+        {selectedDates.length > 0 && (
+          <View style={{ marginTop: 22 }}>
+            <Text style={{ color: C.text, fontSize: 19, fontWeight: "900", marginBottom: 12 }}>Interval orar</Text>
+            {[...selectedDates].sort().map((date) => {
+              const info = dayAvailability[date] || {};
+              return (
+                <View key={date} style={{ backgroundColor: C.panel2, borderRadius: 18, borderWidth: 1, borderColor: C.border, padding: 15, marginBottom: 13 }}>
+                  <Text style={{ color: C.gold, fontSize: 16, fontWeight: "900", marginBottom: 12 }}>
+                    {formatDateRo(date)}
+                  </Text>
+
+                  <Field
+                    label="Tarif dorit (lei/oră)"
+                    value={info.rate || ""}
+                    onChangeText={(v) => setDayAvailability((p) => ({ ...p, [date]: { ...(p[date] || {}), rate: v } }))}
+                    placeholder="Ex: 35"
+                    keyboardType="numeric"
+                  />
+
+                  <View style={{ flexDirection: "row" }}>
+                    <View style={{ flex: 1, marginRight: 6 }}>
+                      <Text style={{ color: C.muted, fontSize: 12, marginBottom: 6 }}>De la</Text>
+                      <TimePickerBox
+                        value={info.start || ""}
+                        onChange={(v) => setDayAvailability((p) => ({ ...p, [date]: { ...(p[date] || {}), start: v } }))}
+                        placeholder="Început"
+                        disabledTimes={TIME_SLOTS.filter((time) => !isPublishStartAllowed(date, time))}
+                      />
+                    </View>
+                    <View style={{ flex: 1, marginLeft: 6 }}>
+                      <Text style={{ color: C.muted, fontSize: 12, marginBottom: 6 }}>Până la</Text>
+                      <TimePickerBox
+                        value={info.end || ""}
+                        onChange={(v) => setDayAvailability((p) => ({ ...p, [date]: { ...(p[date] || {}), end: v } }))}
+                        placeholder="Final"
+                      />
+                    </View>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        )}
+
+        <ErrorBox text={error} />
+        <Button label="Publică disponibilitatea" icon="calendar-outline" onPress={onPublish} style={{ marginTop: 10 }} />
+      </ScreenScroll>
+    </Shell>
+  );
+}
+
+function PublishShiftScreen({ form, setForm, profile, error, busy, onPublish }) {
+  useEffect(() => {
+    setForm((p) => ({
+      ...p,
+      locationName: p.locationName || profile?.location_name || "",
+      city: p.city || profile?.location_city || "",
+      address: p.address || profile?.location_address || "",
+    }));
+  }, [profile?.id]);
+
+  return (
+    <Shell>
+      <ScreenScroll bottom={112}>
+        <Title subtitle="Completează datele turei. Ospătarii vor putea aplica direct din TuraX.">
+          Publică o tură
+        </Title>
+
+        <Text style={{ color: C.gold, fontWeight: "900", marginBottom: 7 }}>Rol căutat</Text>
+        <PickerBox
+          value={form.role}
+          onChange={(v) =>
+            setForm((p) => ({
+              ...p,
+              role: v,
+              customRole: v === "Altele" ? (p.customRole || "") : "",
+            }))
+          }
+          placeholder="Alege rolul"
+          items={SHIFT_ROLES}
+        />
+
+        {form.role === "Altele" && (
+          <View style={{ marginTop: 12 }}>
+            <Field
+              label="Specifică rolul necesar *"
+              icon="briefcase-outline"
+              value={form.customRole || ""}
+              onChangeText={(v) =>
+                setForm((p) => ({ ...p, customRole: v }))
+              }
+              placeholder="Ex: Personal curățenie, Steward bucătărie / Spălător vase"
+            />
+            <Text
+              style={{
+                color: C.muted,
+                fontSize: 12,
+                lineHeight: 18,
+                marginTop: -5,
+                marginBottom: 4,
+              }}
+            >
+              Folosește denumirea profesională a postului. Rolul introdus aici va apărea pe tura publicată.
+            </Text>
+          </View>
+        )}
+
+        <View style={{ height: 14 }} />
+        <Field value={form.locationName} onChangeText={(v) => setForm((p) => ({ ...p, locationName: v }))} placeholder="Numele locației *" icon="business-outline" />
+        <Field value={form.city} onChangeText={(v) => setForm((p) => ({ ...p, city: v }))} placeholder="Oraș *" icon="location-outline" />
+        <Field value={form.address} onChangeText={(v) => setForm((p) => ({ ...p, address: v }))} placeholder="Adresă / Zonă" icon="map-outline" />
+
+        <Text style={{ color: C.text, fontSize: 18, fontWeight: "900", marginTop: 8, marginBottom: 10 }}>Data</Text>
+        <DarkCalendar
+          selectedDates={form.date ? [form.date] : []}
+          onDayPress={(day) => setForm((p) => ({ ...p, date: day.dateString }))}
+          single
+        />
+
+        <Text style={{ color: C.text, fontSize: 18, fontWeight: "900", marginTop: 20, marginBottom: 10 }}>Interval orar</Text>
+        <View style={{ flexDirection: "row", marginBottom: 14 }}>
+          <View style={{ flex: 1, marginRight: 6 }}>
+            <TimePickerBox value={form.start} onChange={(v) => setForm((p) => ({ ...p, start: v }))} placeholder="Început" disabledTimes={TIME_SLOTS.filter((time) => !isPublishStartAllowed(form.date, time))} />
+          </View>
+          <View style={{ flex: 1, marginLeft: 6 }}>
+            <TimePickerBox value={form.end} onChange={(v) => setForm((p) => ({ ...p, end: v }))} placeholder="Final" />
+          </View>
+        </View>
+
+        <Field value={form.workersNeeded} onChangeText={(v) => setForm((p) => ({ ...p, workersNeeded: v }))} placeholder="Număr persoane necesare *" keyboardType="numeric" icon="people-outline" />
+        <Field value={form.hourlyRate} onChangeText={(v) => setForm((p) => ({ ...p, hourlyRate: v }))} placeholder="Tarif lei/oră *" keyboardType="numeric" icon="cash-outline" />
+        <Field value={form.description} onChangeText={(v) => setForm((p) => ({ ...p, description: v }))} placeholder="Detalii suplimentare" multiline />
+
+        <ErrorBox text={error} />
+        <Button label={busy ? "Se publică..." : "Publică tura"} icon="paper-plane-outline" onPress={onPublish} disabled={busy} style={{ marginTop: 8 }} />
+      </ScreenScroll>
+    </Shell>
+  );
+}
+
+function MessagesScreen({ role, conversations, onOpen }) {
+  return (
+    <Shell>
+      <ScreenScroll bottom={110}>
+        <Title subtitle="Conversațiile tale TuraX">Mesaje</Title>
+        {conversations.length === 0 ? (
+          <EmptyCard icon="chatbubble-ellipses-outline" title="Nu ai mesaje încă" text="Conversațiile cu ospătari sau locații vor apărea aici." />
+        ) : (
+          conversations.map((c) => {
+            const counterpartRole = role === "waiter" ? "manager" : "waiter";
+            const avatar = role === "waiter" ? c.manager_avatar_url : c.waiter_avatar_url;
+            const name = role === "waiter" ? c.manager_name || "Locație HoReCa" : c.waiter_name || "Ospătar";
+            return (
+              <TouchableOpacity key={c.id} onPress={() => onOpen(c)} activeOpacity={0.82} style={{ flexDirection: "row", alignItems: "center", paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: C.border }}>
+                <AvatarCircle uri={avatar} role={counterpartRole} size={48} />
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <Text numberOfLines={1} style={{ color: C.text, fontSize: 16, fontWeight: "900", flex: 1 }}>{name}</Text>
+                    <Text style={{ color: C.muted2, fontSize: 11, marginLeft: 8 }}>{conversationTime(c.last_message_at || c.updated_at)}</Text>
+                  </View>
+                  <View style={{ flexDirection: "row", alignItems: "center", marginTop: 4 }}>
+                    <Text numberOfLines={1} style={{ color: c.unread_count ? C.text : C.muted, fontSize: 13, flex: 1, fontWeight: c.unread_count ? "800" : "500" }}>{c.last_message || c.shift_context || "Începe conversația"}</Text>
+                    {!!c.unread_count && (
+                      <View style={{ minWidth: 20, height: 20, borderRadius: 10, backgroundColor: C.gold, alignItems: "center", justifyContent: "center", paddingHorizontal: 5, marginLeft: 8 }}>
+                        <Text style={{ color: "#07111D", fontSize: 10, fontWeight: "900" }}>{c.unread_count > 9 ? "9+" : c.unread_count}</Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+                <Ionicons name="chevron-forward" size={21} color={C.gold} style={{ marginLeft: 6 }} />
+              </TouchableOpacity>
+            );
+          })
+        )}
+      </ScreenScroll>
+    </Shell>
+  );
+}
+
+function ChatScreen({ role, conversation, messages, currentUserId, text, setText, onBack, onSend }) {
+  const scrollRef = React.useRef(null);
+  const name = role === "waiter" ? conversation?.manager_name || "Locație HoReCa" : conversation?.waiter_name || "Ospătar";
+  const avatar = role === "waiter" ? conversation?.manager_avatar_url : conversation?.waiter_avatar_url;
+  const counterpartRole = role === "waiter" ? "manager" : "waiter";
+
+  useEffect(() => {
+    const id = setTimeout(() => scrollRef.current?.scrollToEnd?.({ animated: true }), 80);
+    return () => clearTimeout(id);
+  }, [messages.length]);
+
+  return (
+    <Shell>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"} keyboardVerticalOffset={0}>
+        <View style={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 10, flexDirection: "row", alignItems: "center", borderBottomWidth: 1, borderBottomColor: C.border }}>
+          <TouchableOpacity onPress={onBack} style={{ padding: 8, marginRight: 4 }}><Ionicons name="arrow-back" size={24} color={C.gold} /></TouchableOpacity>
+          <AvatarCircle uri={avatar} role={counterpartRole} size={40} />
+          <View style={{ flex: 1, marginLeft: 10 }}>
+            <Text numberOfLines={1} style={{ color: C.text, fontSize: 18, fontWeight: "900" }}>{name}</Text>
+            {!!conversation?.shift_context && <Text numberOfLines={1} style={{ color: C.muted, fontSize: 11, marginTop: 2 }}>{conversation.shift_context}</Text>}
+          </View>
+        </View>
+
+        <ScrollView
+          ref={scrollRef}
+          style={{ flex: 1 }}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          contentContainerStyle={{ padding: 16, paddingBottom: 24 }}
+          onContentSizeChange={() => scrollRef.current?.scrollToEnd?.({ animated: false })}
+        >
+          {messages.map((m, index) => {
+            const mine = m.sender_id === currentUserId;
+            const prev = index > 0 ? messages[index - 1] : null;
+            const showDay = !prev || !sameDay(prev.created_at, m.created_at);
+            return (
+              <React.Fragment key={m.id}>
+                {showDay && (
+                  <View style={{ alignItems: "center", marginVertical: 12 }}>
+                    <Text style={{ color: C.muted2, fontSize: 11, backgroundColor: C.panel, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 }}>{messageDayLabel(m.created_at)}</Text>
+                  </View>
+                )}
+                <View style={{ alignSelf: mine ? "flex-end" : "flex-start", maxWidth: "82%", backgroundColor: mine ? C.gold : C.panel2, borderRadius: 16, paddingHorizontal: 13, paddingVertical: 9, marginBottom: 9 }}>
+                  <Text style={{ color: mine ? "#07111D" : C.text, lineHeight: 19 }}>{m.body}</Text>
+                  <Text style={{ color: mine ? "rgba(7,17,29,0.65)" : C.muted2, fontSize: 10, marginTop: 4, textAlign: "right" }}>{m._sending ? "Se trimite…" : messageTime(m.created_at)}</Text>
+                </View>
+              </React.Fragment>
+            );
+          })}
+        </ScrollView>
+
+        <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingTop: 10, paddingBottom: Platform.OS === "android" ? 10 : 12, borderTopWidth: 1, borderTopColor: C.border, backgroundColor: C.bg }}>
+          <TextInput value={text} onChangeText={setText} placeholder="Scrie un mesaj..." placeholderTextColor={C.muted2} returnKeyType="send" onSubmitEditing={onSend} style={{ flex: 1, minHeight: 48, borderRadius: 15, backgroundColor: C.panel, color: C.text, paddingHorizontal: 14, borderWidth: 1, borderColor: C.border }} />
+          <TouchableOpacity onPress={onSend} style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: C.gold, alignItems: "center", justifyContent: "center", marginLeft: 8 }}><Ionicons name="send" size={21} color="#07111D" /></TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+    </Shell>
+  );
+}
+
+function ProfileScreen({ role, profile, shifts, acceptedShifts, onEdit, onNotifications, onSignOut, onDeleteAccount, deleteAccountBusy, onChangePhoto, photoBusy, onOpenShifts }) {
+  const manager = role === "manager";
+  const name = manager ? profile?.location_name || "Locație" : profile?.full_name || "Ospătar";
+  return (
+    <Shell>
+      <ScreenScroll bottom={110}>
+        <View style={{ alignItems: "center", marginTop: 12 }}>
+          <TouchableOpacity onPress={onChangePhoto} disabled={photoBusy} activeOpacity={0.82} style={{ position: "relative" }}>
+            <AvatarCircle uri={profile?.avatar_url} role={role} size={108} />
+            <View style={{ position: "absolute", right: -2, bottom: -2, width: 34, height: 34, borderRadius: 17, backgroundColor: C.gold, borderWidth: 3, borderColor: C.bg, alignItems: "center", justifyContent: "center" }}>
+              {photoBusy ? <ActivityIndicator size="small" color="#07111D" /> : <Ionicons name="camera-outline" size={18} color="#07111D" />}
+            </View>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={onChangePhoto} disabled={photoBusy} style={{ paddingVertical: 8 }}>
+            <Text style={{ color: C.gold, fontSize: 12, fontWeight: "800" }}>{profile?.avatar_url ? "Schimbă fotografia" : manager ? "Adaugă logo / fotografie" : "Adaugă fotografie"}</Text>
+          </TouchableOpacity>
+          <Text style={{ color: C.text, fontSize: 27, fontWeight: "900", marginTop: 5 }}>{name}</Text>
+          <Text style={{ color: C.gold, fontWeight: "800", marginTop: 5 }}>
+              {manager ? "Restaurant / angajator" : "Profesionist HoReCa"}
+            </Text>
+
+            {!manager &&
+              Array.isArray(profile?.worker_roles) &&
+              profile.worker_roles.length > 0 && (
+                <Text
+                  style={{
+                    color: C.muted,
+                    fontSize: 14,
+                    fontWeight: "700",
+                    marginTop: 7,
+                    textAlign: "center",
+                    lineHeight: 20,
+                  }}
+                >
+                  {profile.worker_roles.join(" · ")}
+                </Text>
+              )}
+        </View>
+
+        <View style={{ flexDirection: "row", marginTop: 24 }}>
+          <TouchableOpacity onPress={onOpenShifts} activeOpacity={0.82} style={{ flex: 1, backgroundColor: C.panel2, borderRadius: 18, borderWidth: 1, borderColor: C.border, padding: 15, marginRight: 7, alignItems: "center" }}>
+            <Text style={{ color: C.gold, fontSize: 24, fontWeight: "900" }}>{manager ? shifts.length : acceptedShifts.length}</Text>
+            <Text style={{ color: C.muted, fontSize: 12, marginTop: 4 }}>{manager ? "Ture publicate" : "Ture confirmate"}</Text>
+          </TouchableOpacity>
+          <View style={{ flex: 1, backgroundColor: C.panel2, borderRadius: 18, borderWidth: 1, borderColor: C.border, padding: 15, marginLeft: 7, alignItems: "center" }}>
+            <Text style={{ color: C.gold, fontSize: 24, fontWeight: "900" }}>{profile?.rating ? Number(profile.rating).toFixed(1) : "—"}</Text>
+            <Text style={{ color: C.muted, fontSize: 12, marginTop: 4 }}>Rating</Text>
+          </View>
+        </View>
+
+        <Button label="Editează profilul" secondary icon="create-outline" onPress={onEdit} style={{ marginTop: 20 }} />
+        <Button label="Notificări" secondary icon="notifications-outline" onPress={onNotifications} style={{ marginTop: 12 }} />
+        <Button label="Deconectare" danger icon="log-out-outline" onPress={onSignOut} style={{ marginTop: 24 }} />
+
+      <Button
+        label={deleteAccountBusy ? "Se șterge..." : "Șterge contul"}
+        danger
+        icon="trash-outline"
+        onPress={onDeleteAccount}
+        disabled={deleteAccountBusy}
+        style={{
+          marginTop: 12,
+          opacity: deleteAccountBusy ? 0.6 : 1,
+        }}
+      />
+      </ScreenScroll>
+    </Shell>
+  );
+}
+
+function applicationStatusLabel(status) {
+  if (status === "pending") return "În așteptare";
+  if (status === "accepted") return "Confirmată";
+  if (status === "rejected") return "Respinsă";
+  if (status === "cancelled") return "Anulată";
+  if (status === "completed") return "Finalizată";
+  if (status === "no_show") return "Neprezentare";
+  return status || "—";
+}
+
+function MyWaiterActivityScreen({
+  availabilities,
+  applications,
+  onBack,
+  onWithdrawAvailability,
+  onCancelApplication,
+  onRateManager,
+  onOpenShift,
+}) {
+  const active = applications.filter((a) => ["pending", "accepted"].includes(a.status));
+  const history = applications.filter((a) => !["pending", "accepted"].includes(a.status));
+
+  const renderApplication = (a) => {
+    const shift = a.shifts || {};
+    const confirmed = a.status === "accepted";
+    const cancellationAllowed = !confirmed || canCancelConfirmedShift(shift);
+    const canCancel = a.status === "pending" || confirmed;
+    const statusColor =
+      a.status === "accepted" || a.status === "completed"
+        ? C.success
+        : a.status === "rejected" || a.status === "cancelled" || a.status === "no_show"
+        ? C.danger
+        : C.gold;
+
+    return (
+      <View key={a.id} style={{ backgroundColor: C.panel2, borderRadius: 18, borderWidth: 1, borderColor: C.border, padding: 16, marginBottom: 12 }}>
+        <TouchableOpacity onPress={() => onOpenShift(a)} activeOpacity={0.8}>
+          <Text style={{ color: C.text, fontSize: 17, fontWeight: "900" }}>{shift.location_name || "Tură HoReCa"}</Text>
+          <Text style={{ color: C.muted, marginTop: 5 }}>
+            {shift.role || "—"} · {formatDateRo(shift.shift_date)} · {String(shift.start_time || "").slice(0, 5)}–{String(shift.end_time || "").slice(0, 5)}
+          </Text>
+          <Text style={{ color: statusColor, marginTop: 8, fontWeight: "900" }}>{applicationStatusLabel(a.status)}</Text>
+        </TouchableOpacity>
+
+        {confirmed && !cancellationAllowed && (
+          <View style={{ flexDirection: "row", alignItems: "flex-start", marginTop: 10 }}>
+            <Ionicons name="lock-closed-outline" size={18} color={C.warning} style={{ marginRight: 7, marginTop: 1 }} />
+            <Text style={{ color: C.warning, lineHeight: 19, flex: 1 }}>
+              Anularea este blocată: au rămas 48 de ore sau mai puțin până la începerea turei.
+            </Text>
+          </View>
+        )}
+
+        {canCancel && (
+          <TouchableOpacity
+            disabled={confirmed && !cancellationAllowed}
+            onPress={() => onCancelApplication(a)}
+            style={{
+              alignSelf: "flex-start",
+              marginTop: 12,
+              borderWidth: 1,
+              borderColor: confirmed && !cancellationAllowed ? C.border : C.danger,
+              borderRadius: 12,
+              paddingVertical: 9,
+              paddingHorizontal: 13,
+              opacity: confirmed && !cancellationAllowed ? 0.45 : 1,
+            }}
+          >
+            <Text style={{ color: confirmed && !cancellationAllowed ? C.muted : C.danger, fontWeight: "900" }}>
+              {confirmed ? "Anulează tura" : "Retrage candidatura"}
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        {a.status === "completed" && shift.manager_id && (
+          <RatingStars
+            label="Evaluează locația după această tură"
+            compact
+            onRate={(rating) => onRateManager(a, rating)}
+          />
+        )}
+
+        {a.status === "no_show" && (
+          <Text style={{ color: C.danger, marginTop: 10, lineHeight: 19 }}>
+            Managerul a înregistrat o neprezentare pentru această tură.
+          </Text>
+        )}
+      </View>
+    );
+  };
+
+  return (
+    <Shell>
+      <ScreenScroll bottom={45}>
+        <BackButton onPress={onBack} />
+        <Title subtitle="Disponibilități, angajamente active și istoricul tău.">Programul meu</Title>
+
+        <View style={{ backgroundColor: C.panel2, borderRadius: 17, borderWidth: 1, borderColor: C.border, padding: 14, marginBottom: 22 }}>
+          <Text style={{ color: C.gold, fontWeight: "900" }}>Regula de anulare</Text>
+          <Text style={{ color: C.muted, marginTop: 6, lineHeight: 20 }}>
+            Disponibilitatea simplă poate fi retrasă. O tură confirmată poate fi anulată numai când au rămas mai mult de 48 de ore până la începere. Regula este verificată și în Supabase, nu doar de buton.
+          </Text>
+        </View>
+
+        <Text style={{ color: C.text, fontSize: 20, fontWeight: "900", marginBottom: 12 }}>
+          Disponibilitățile mele ({availabilities.length})
+        </Text>
+        {availabilities.length === 0 ? (
+          <EmptyCard icon="calendar-outline" title="Nu ai disponibilități active" text="Publică una din butonul Publică." />
+        ) : (
+          availabilities.map((r) => (
+            <View key={r.id} style={{ backgroundColor: C.panel2, borderRadius: 18, borderWidth: 1, borderColor: C.border, padding: 16, marginBottom: 12 }}>
+              <Text style={{ color: C.text, fontSize: 17, fontWeight: "900" }}>{formatDateRo(r.available_date)}</Text>
+              <Text style={{ color: C.gold, marginTop: 7, fontWeight: "800" }}>
+                {String(r.start_time || "").slice(0, 5)} – {String(r.end_time || "").slice(0, 5)} · {money(r.desired_rate)}/oră
+              </Text>
+              <Text style={{ color: C.success, marginTop: 6, fontWeight: "800" }}>Activă</Text>
+              <TouchableOpacity onPress={() => onWithdrawAvailability(r)} style={{ alignSelf: "flex-start", marginTop: 12, borderWidth: 1, borderColor: C.danger, borderRadius: 12, paddingVertical: 9, paddingHorizontal: 13 }}>
+                <Text style={{ color: C.danger, fontWeight: "900" }}>Retrage disponibilitatea</Text>
+              </TouchableOpacity>
+            </View>
+          ))
+        )}
+
+        <Text style={{ color: C.text, fontSize: 20, fontWeight: "900", marginTop: 26, marginBottom: 12 }}>
+          Angajamente active ({active.length})
+        </Text>
+        {active.length === 0 ? (
+          <EmptyCard icon="briefcase-outline" title="Nicio candidatură activă" text="Candidaturile noi și turele confirmate apar aici." />
+        ) : (
+          active.map(renderApplication)
+        )}
+
+        <Text style={{ color: C.text, fontSize: 20, fontWeight: "900", marginTop: 26, marginBottom: 12 }}>
+          Istoric ({history.length})
+        </Text>
+        {history.length === 0 ? (
+          <EmptyCard icon="time-outline" title="Istoricul este gol" text="Turele finalizate, anulate, respinse sau no-show vor rămâne aici." />
+        ) : (
+          history.map(renderApplication)
+        )}
+      </ScreenScroll>
+    </Shell>
+  );
+}
+
+
+function ConfirmedShiftsScreen({ applications, onBack, onOpenShift }) {
+  const confirmed = applications.filter((a) => a.status === "accepted" && a.shifts && !hasShiftEnded(a.shifts));
+  return (
+    <Shell>
+      <ScreenScroll bottom={45}>
+        <BackButton onPress={onBack} />
+        <Title subtitle="Doar turele tale confirmate și încă active.">Ture confirmate</Title>
+        {confirmed.length === 0 ? (
+          <EmptyCard icon="checkmark-circle-outline" title="Nu ai ture confirmate" text="Când o candidatură este acceptată, tura va apărea aici." />
+        ) : (
+          confirmed.map((a) => (
+            <ShiftCard key={a.id} shift={a.shifts} onPress={() => onOpenShift(a)} />
+          ))
+        )}
+      </ScreenScroll>
+    </Shell>
+  );
+}
+
+function WaiterDirectoryScreen({ rows, loading, error, onBack, onMessage, onOpenProfile }) {
+  const [query, setQuery] = useState("");
+  const q = query.trim().toLowerCase();
+  const filtered = !q ? rows : rows.filter((r) =>
+    [r.waiter_name, r.city, ...(r.work_types || []), ...(r.worker_roles || []), ...(r.horeca_skills || [])]
+      .filter(Boolean).join(" ").toLowerCase().includes(q)
+  );
+  return (
+    <Shell>
+      <ScreenScroll bottom={45}>
+        <BackButton onPress={onBack} />
+        <Title subtitle="Catalogul profesioniștilor TuraX. Disponibilitatea publicată apare separat.">Vezi oameni</Title>
+        <Field icon="search-outline" value={query} onChangeText={setQuery} placeholder="Caută după nume, oraș sau competență" />
+        <ErrorBox text={error} />
+        {loading ? (
+          <ActivityIndicator color={C.gold} />
+        ) : filtered.length === 0 ? (
+          <EmptyCard icon="people-outline" title="Niciun profil găsit" text="Încearcă altă căutare." />
+        ) : (
+          filtered.map((r) => (
+            <View key={r.waiter_id} style={{ backgroundColor: C.panel2, borderRadius: 18, borderWidth: 1, borderColor: C.border, padding: 16, marginBottom: 13 }}>
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <AvatarCircle uri={r.waiter_avatar_url} role="waiter" size={54} />
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={{ color: C.text, fontSize: 18, fontWeight: "900" }}>{r.waiter_name || "Ospătar"}</Text>
+                  <Text style={{ color: C.muted, marginTop: 4 }}>{r.city || "Oraș nespecificat"} · {Number(r.experience || 0)} ani experiență</Text>
+                  <Text style={{ color: C.gold, marginTop: 4, fontWeight: "800" }}>{r.rating ? `★ ${Number(r.rating).toFixed(1)} (${r.review_count || 0})` : "Fără rating încă"}</Text>
+                </View>
+              </View>
+              {!!r.description && <Text style={{ color: C.muted, lineHeight: 20, marginTop: 12 }}>{r.description}</Text>}
+              {(r.horeca_skills || []).length > 0 && <Text style={{ color: C.text, marginTop: 10, lineHeight: 20 }}>{r.horeca_skills.slice(0, 4).join(" · ")}</Text>}
+              {r.next_available_date ? (
+                <View style={{ marginTop: 12, borderRadius: 13, backgroundColor: C.panel3, padding: 11 }}>
+                  <Text style={{ color: C.success, fontWeight: "900" }}>Disponibil {formatDateRo(r.next_available_date)} · {String(r.next_start_time || "").slice(0,5)}–{String(r.next_end_time || "").slice(0,5)}{r.desired_rate ? ` · ${money(r.desired_rate)}/oră` : ""}</Text>
+                </View>
+              ) : (
+                <Text style={{ color: C.muted2, marginTop: 12 }}>Fără disponibilitate publicată momentan</Text>
+              )}
+              <View style={{ flexDirection: "row", marginTop: 12 }}>
+                <Button
+                  label="Vezi profilul"
+                  icon="person-circle-outline"
+                  secondary
+                  onPress={() => onOpenProfile(r)}
+                  style={{ flex: 1, marginRight: 7 }}
+                />
+                <Button
+                  label="Mesaj"
+                  icon="chatbubble-outline"
+                  secondary
+                  onPress={() => onMessage(r)}
+                  style={{ flex: 1, marginLeft: 7 }}
+                />
+              </View>
+            </View>
+          ))
+        )}
+      </ScreenScroll>
+    </Shell>
+  );
+}
+
+
+function WorkerPublicProfileScreen({
+  worker,
+  loading,
+  error,
+  onBack,
+  onMessage,
+}) {
+  if (loading && !worker) {
+    return (
+      <Shell>
+        <ScreenScroll bottom={45}>
+          <BackButton onPress={onBack} />
+          <ActivityIndicator color={C.gold} />
+        </ScreenScroll>
+      </Shell>
+    );
+  }
+
+  if (!worker) {
+    return (
+      <Shell>
+        <ScreenScroll bottom={45}>
+          <BackButton onPress={onBack} />
+          <ErrorBox text={error || "Profilul nu este disponibil."} />
+        </ScreenScroll>
+      </Shell>
+    );
+  }
+
+  const roles = Array.isArray(worker.worker_roles)
+    ? worker.worker_roles
+    : [];
+
+  const workTypes = Array.isArray(worker.work_types)
+    ? worker.work_types
+    : [];
+
+  const skills = Array.isArray(worker.horeca_skills)
+    ? worker.horeca_skills
+    : [];
+
+  const availability = Array.isArray(worker.availability)
+    ? worker.availability
+    : [];
+
+  return (
+    <Shell>
+      <ScreenScroll bottom={50}>
+        <BackButton onPress={onBack} />
+
+        <View style={{ alignItems: "center", marginBottom: 24 }}>
+          <AvatarCircle
+            uri={worker.avatar_url || worker.waiter_avatar_url}
+            role="waiter"
+            size={92}
+          />
+
+          <Text
+            style={{
+              color: C.text,
+              fontSize: 28,
+              fontWeight: "900",
+              marginTop: 14,
+              textAlign: "center",
+            }}
+          >
+            {worker.full_name || worker.waiter_name || "Profesionist HoReCa"}
+          </Text>
+
+          <Text
+            style={{
+              color: C.gold,
+              fontWeight: "800",
+              marginTop: 5,
+              fontSize: 16,
+            }}
+          >
+            Profesionist HoReCa
+          </Text>
+
+          {roles.length > 0 && (
+            <Text
+              style={{
+                color: C.muted,
+                textAlign: "center",
+                lineHeight: 21,
+                marginTop: 8,
+              }}
+            >
+              {roles.join(" · ")}
+            </Text>
+          )}
+        </View>
+
+        <View
+          style={{
+            backgroundColor: C.panel2,
+            borderRadius: 20,
+            borderWidth: 1,
+            borderColor: C.border,
+            padding: 18,
+            marginBottom: 14,
+          }}
+        >
+          <Text style={{ color: C.gold, fontWeight: "900", fontSize: 17 }}>
+            Experiență profesională
+          </Text>
+
+          <Text style={{ color: C.text, marginTop: 12, fontSize: 16 }}>
+            {Number(worker.experience || 0)} ani experiență
+          </Text>
+
+          <Text style={{ color: C.muted, marginTop: 7 }}>
+            {worker.city || "Oraș nespecificat"}
+          </Text>
+
+          {worker.rating ? (
+            <Text style={{ color: C.gold, marginTop: 9, fontWeight: "800" }}>
+              ★ {Number(worker.rating).toFixed(1)} · {worker.review_count || 0} recenzii
+            </Text>
+          ) : (
+            <Text style={{ color: C.muted, marginTop: 9 }}>
+              Fără rating încă
+            </Text>
+          )}
+        </View>
+
+        {workTypes.length > 0 && (
+          <View
+            style={{
+              backgroundColor: C.panel2,
+              borderRadius: 20,
+              borderWidth: 1,
+              borderColor: C.border,
+              padding: 18,
+              marginBottom: 14,
+            }}
+          >
+            <Text style={{ color: C.gold, fontWeight: "900", fontSize: 17 }}>
+              Experiență în
+            </Text>
+            <Text style={{ color: C.text, lineHeight: 22, marginTop: 10 }}>
+              {workTypes.join(" · ")}
+            </Text>
+          </View>
+        )}
+
+        {skills.length > 0 && (
+          <View
+            style={{
+              backgroundColor: C.panel2,
+              borderRadius: 20,
+              borderWidth: 1,
+              borderColor: C.border,
+              padding: 18,
+              marginBottom: 14,
+            }}
+          >
+            <Text style={{ color: C.gold, fontWeight: "900", fontSize: 17 }}>
+              Competențe HoReCa
+            </Text>
+            <Text style={{ color: C.text, lineHeight: 22, marginTop: 10 }}>
+              {skills.join(" · ")}
+            </Text>
+          </View>
+        )}
+
+        {!!worker.description && (
+          <View
+            style={{
+              backgroundColor: C.panel2,
+              borderRadius: 20,
+              borderWidth: 1,
+              borderColor: C.border,
+              padding: 18,
+              marginBottom: 14,
+            }}
+          >
+            <Text style={{ color: C.gold, fontWeight: "900", fontSize: 17 }}>
+              Despre
+            </Text>
+            <Text style={{ color: C.muted, lineHeight: 21, marginTop: 10 }}>
+              {worker.description}
+            </Text>
+          </View>
+        )}
+
+        <View
+          style={{
+            backgroundColor: C.panel2,
+            borderRadius: 20,
+            borderWidth: 1,
+            borderColor: C.border,
+            padding: 18,
+            marginBottom: 16,
+          }}
+        >
+          <Text style={{ color: C.gold, fontWeight: "900", fontSize: 17 }}>
+            Disponibilitate
+          </Text>
+
+          {availability.length === 0 ? (
+            <Text style={{ color: C.muted, marginTop: 10 }}>
+              Nu are disponibilități publicate momentan.
+            </Text>
+          ) : (
+            availability.map((a) => (
+              <View
+                key={a.id || `${a.available_date}-${a.start_time}`}
+                style={{
+                  marginTop: 12,
+                  paddingTop: 12,
+                  borderTopWidth: 1,
+                  borderTopColor: C.border,
+                }}
+              >
+                <Text style={{ color: C.text, fontWeight: "800" }}>
+                  {formatDateRo(a.available_date)}
+                </Text>
+                <Text style={{ color: C.muted, marginTop: 4 }}>
+                  {String(a.start_time || "").slice(0, 5)}
+                  {" – "}
+                  {String(a.end_time || "").slice(0, 5)}
+                  {a.desired_rate
+                    ? ` · ${money(a.desired_rate)}/oră`
+                    : ""}
+                </Text>
+              </View>
+            ))
+          )}
+        </View>
+
+        <ErrorBox text={error} />
+
+        <Button
+          label="Trimite mesaj"
+          icon="chatbubble-outline"
+          onPress={() => onMessage(worker)}
+        />
+      </ScreenScroll>
+    </Shell>
+  );
+}
+
+function AvailableWaitersScreen({ rows, onBack, onMessage }) {
+  return (
+    <Shell>
+      <ScreenScroll bottom={40}>
+        <BackButton onPress={onBack} />
+        <Title subtitle="Disponibilități publicate de profesioniști HoReCa.">Oameni disponibili</Title>
+        {rows.length === 0 ? (
+          <EmptyCard icon="people-outline" title="Nicio disponibilitate publicată" text="Revino mai târziu." />
+        ) : (
+          rows.map((r) => (
+            <View key={r.id} style={{ backgroundColor: C.panel2, borderRadius: 18, borderWidth: 1, borderColor: C.border, padding: 16, marginBottom: 12 }}>
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <AvatarCircle uri={r.waiter_avatar_url} role="waiter" size={46} />
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={{ color: C.text, fontSize: 17, fontWeight: "900" }}>{r.waiter_name || "Ospătar"}</Text>
+                  <Text style={{ color: C.muted, marginTop: 4 }}>{r.city || "Oraș nespecificat"} · {formatDateRo(r.available_date)}</Text>
+                </View>
+              </View>
+              <Text style={{ color: C.gold, marginTop: 10, fontWeight: "800" }}>{String(r.start_time || "").slice(0, 5)} – {String(r.end_time || "").slice(0, 5)} · {money(r.desired_rate)}/oră</Text>
+              <TouchableOpacity onPress={() => onMessage(r)} style={{ flexDirection: "row", alignItems: "center", alignSelf: "flex-start", marginTop: 12 }}>
+                <Ionicons name="chatbubble-outline" size={18} color={C.gold} />
+                <Text style={{ color: C.gold, fontWeight: "800", marginLeft: 7 }}>Trimite mesaj</Text>
+              </TouchableOpacity>
+            </View>
+          ))
+        )}
+      </ScreenScroll>
+    </Shell>
+  );
+}
+
+function ShiftInfoRow({ icon, children }) {
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", marginTop: 9 }}>
+      <Ionicons name={icon} size={18} color={C.muted} style={{ width: 25 }} />
+      <Text style={{ color: C.muted, flex: 1, lineHeight: 20 }}>{children}</Text>
+    </View>
+  );
+}
+
+function shiftStatusLabel(status) {
+  if (status === "open") return "Deschisă";
+  if (status === "closed") return "Locuri ocupate";
+  if (status === "cancelled") return "Anulată";
+  if (status === "completed") return "Finalizată";
+  return status || "—";
+}
+
+function ShiftDetailScreen({
+  role,
+  shift,
+  applications,
+  favorite,
+  currentApplication,
+  onBack,
+  onFavorite,
+  onApply,
+  applyBusy,
+  onMessage,
+  onApplicationStatus,
+  onCancelShift,
+  onAttendance,
+  onRateApplicant,
+  onMessageApplicant,
+}) {
+  if (!shift) return null;
+  const manager = role === "manager";
+  const needed = Math.max(1, Number(shift.workers_needed || 1));
+  const filled = Math.max(0, Number(shift.filled_positions || 0));
+  const remaining = Math.max(0, needed - filled);
+  const applicationStatus = currentApplication?.status || null;
+  const ended = hasShiftEnded(shift);
+  const start = shiftStartDate(shift);
+  const acceptingApplications = shift.status === "open" && remaining > 0 && !!start && start.getTime() > Date.now();
+  const cancellableByManager = manager && ["open", "closed"].includes(shift.status) && !ended;
+  const shiftStatusColor =
+    shift.status === "completed"
+      ? C.success
+      : shift.status === "cancelled"
+      ? C.danger
+      : shift.status === "closed"
+      ? C.warning
+      : C.gold;
+  const statusColor =
+    applicationStatus === "accepted" || applicationStatus === "completed"
+      ? C.success
+      : applicationStatus === "rejected" || applicationStatus === "cancelled" || applicationStatus === "no_show"
+      ? C.danger
+      : C.gold;
+
+  return (
+    <Shell>
+      <ScreenScroll bottom={40}>
+        <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+          <BackButton onPress={onBack} />
+          {!manager && (
+            <TouchableOpacity onPress={onFavorite} style={{ width: 48, height: 48, borderRadius: 15, borderWidth: 1, borderColor: C.border, backgroundColor: C.panel, alignItems: "center", justifyContent: "center" }}>
+              <Ionicons name={favorite ? "heart" : "heart-outline"} size={24} color={C.gold} />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        <Text style={{ color: C.text, fontSize: 30, fontWeight: "900" }}>{shift.location_name}</Text>
+        <Text style={{ color: C.gold, fontSize: 18, fontWeight: "900", marginTop: 5 }}>{shift.role}</Text>
+        <View style={{ alignSelf: "flex-start", marginTop: 10, borderRadius: 999, borderWidth: 1, borderColor: shiftStatusColor, paddingHorizontal: 11, paddingVertical: 6 }}>
+          <Text style={{ color: shiftStatusColor, fontWeight: "900", fontSize: 12 }}>{shiftStatusLabel(shift.status)}</Text>
+        </View>
+
+        <View style={{ backgroundColor: C.panel2, borderRadius: 18, borderWidth: 1, borderColor: C.border, padding: 17, marginTop: 20 }}>
+          <ShiftInfoRow icon="location-outline">{shift.city}{shift.address ? `, ${shift.address}` : ""}</ShiftInfoRow>
+          <ShiftInfoRow icon="calendar-outline">{formatDateRo(shift.shift_date)}</ShiftInfoRow>
+          <ShiftInfoRow icon="time-outline">{String(shift.start_time || "").slice(0, 5)} – {String(shift.end_time || "").slice(0, 5)}</ShiftInfoRow>
+          <ShiftInfoRow icon="people-outline">{remaining} din {needed} {needed === 1 ? "loc disponibil" : "locuri disponibile"}</ShiftInfoRow>
+          <Text style={{ color: C.success, fontSize: 18, fontWeight: "900", marginTop: 14 }}>{money(shift.hourly_rate)}/oră</Text>
+        </View>
+
+        {!!shift.description && (
+          <>
+            <Text style={{ color: C.text, fontSize: 19, fontWeight: "900", marginTop: 24, marginBottom: 8 }}>Detalii</Text>
+            <Text style={{ color: C.muted, lineHeight: 22 }}>{formatHorecaText(shift.description)}</Text>
+          </>
+        )}
+
+        {!manager && (
+          <>
+            {currentApplication ? (
+              <View style={{ marginTop: 28, borderRadius: 17, borderWidth: 1, borderColor: statusColor, backgroundColor: C.panel2, padding: 15, flexDirection: "row", alignItems: "center" }}>
+                <Ionicons
+                  name={applicationStatus === "accepted" ? "checkmark-circle" : applicationStatus === "pending" ? "time-outline" : "information-circle-outline"}
+                  size={24}
+                  color={statusColor}
+                  style={{ marginRight: 11 }}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: C.text, fontWeight: "900", fontSize: 16 }}>Candidatura ta</Text>
+                  <Text style={{ color: statusColor, fontWeight: "800", marginTop: 3 }}>{applicationStatusLabel(applicationStatus)}</Text>
+                </View>
+              </View>
+            ) : acceptingApplications ? (
+              <Button label={applyBusy ? "Se trimite..." : "Aplică acum"} icon="checkmark-circle-outline" onPress={onApply} disabled={applyBusy} style={{ marginTop: 28 }} />
+            ) : (
+              <View style={{ marginTop: 28, borderRadius: 17, borderWidth: 1, borderColor: C.border, backgroundColor: C.panel2, padding: 15 }}>
+                <Text style={{ color: C.muted, lineHeight: 20 }}>Această tură nu mai primește candidaturi.</Text>
+              </View>
+            )}
+            <Button label="Trimite mesaj" secondary icon="chatbubble-outline" onPress={onMessage} style={{ marginTop: 12 }} />
+          </>
+        )}
+
+        {manager && (
+          <>
+            <View style={{ marginTop: 24, borderRadius: 16, borderWidth: 1, borderColor: C.border, backgroundColor: C.panel, padding: 13 }}>
+              <Text style={{ color: C.muted }}>Locuri ocupate</Text>
+              <Text style={{ color: C.gold, fontSize: 20, fontWeight: "900", marginTop: 3 }}>{filled} / {needed}</Text>
+              {ended && shift.status !== "cancelled" && (
+                <Text style={{ color: C.muted, marginTop: 7, lineHeight: 19 }}>
+                  Tura s-a încheiat. Marchează prezența fiecărui ospătar confirmat.
+                </Text>
+              )}
+            </View>
+
+            {cancellableByManager && (
+              <Button label="Anulează tura" danger icon="close-circle-outline" onPress={() => onCancelShift(shift)} style={{ marginTop: 12 }} />
+            )}
+
+            <Text style={{ color: C.text, fontSize: 20, fontWeight: "900", marginTop: 24, marginBottom: 12 }}>
+              Candidați ({applications.length})
+            </Text>
+            {applications.length === 0 ? (
+              <EmptyCard icon="people-outline" title="Nicio candidatură încă" />
+            ) : (
+              applications.map((a) => (
+                <View key={a.id} style={{ backgroundColor: C.panel2, borderRadius: 18, borderWidth: 1, borderColor: C.border, padding: 15, marginBottom: 12 }}>
+                  <Text style={{ color: C.text, fontSize: 16, fontWeight: "900" }}>{a.waiter_name || "Ospătar"}</Text>
+                  <Text style={{ color: C.muted, marginTop: 4 }}>{a.waiter_city || "—"} · {a.waiter_experience || 0} ani experiență</Text>
+                  <Text style={{ color: a.status === "accepted" || a.status === "completed" ? C.success : ["rejected", "cancelled", "no_show"].includes(a.status) ? C.danger : C.gold, fontWeight: "800", marginTop: 7 }}>
+                    {applicationStatusLabel(a.status)}
+                  </Text>
+
+                  {a.status === "pending" && shift.status === "open" && (
+                    <View style={{ flexDirection: "row", marginTop: 12 }}>
+                      <TouchableOpacity onPress={() => onApplicationStatus(a.id, "accepted")} style={{ flex: 1, backgroundColor: C.success, borderRadius: 12, paddingVertical: 10, alignItems: "center", marginRight: 5 }}>
+                        <Text style={{ color: "#07111D", fontWeight: "900" }}>Acceptă</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => onApplicationStatus(a.id, "rejected")} style={{ flex: 1, borderWidth: 1, borderColor: C.danger, borderRadius: 12, paddingVertical: 10, alignItems: "center", marginHorizontal: 5 }}>
+                        <Text style={{ color: C.danger, fontWeight: "900" }}>Respinge</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => onMessageApplicant(a)} style={{ width: 45, borderWidth: 1, borderColor: C.border, borderRadius: 12, alignItems: "center", justifyContent: "center", marginLeft: 5 }}>
+                        <Ionicons name="chatbubble-outline" size={20} color={C.gold} />
+                      </TouchableOpacity>
+                    </View>
+                  )}
+
+                  {a.status === "accepted" && ended && (
+                    <View style={{ marginTop: 12 }}>
+                      <Text style={{ color: C.muted, fontSize: 13, marginBottom: 8 }}>Prezență după tură</Text>
+                      <View style={{ flexDirection: "row" }}>
+                        <TouchableOpacity onPress={() => onAttendance(a, "completed")} style={{ flex: 1, backgroundColor: C.success, borderRadius: 12, minHeight: 44, alignItems: "center", justifyContent: "center", marginRight: 6 }}>
+                          <Text style={{ color: "#07111D", fontWeight: "900" }}>S-a prezentat</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => onAttendance(a, "no_show")} style={{ flex: 1, borderWidth: 1, borderColor: C.danger, borderRadius: 12, minHeight: 44, alignItems: "center", justifyContent: "center", marginLeft: 6 }}>
+                          <Text style={{ color: C.danger, fontWeight: "900" }}>No-show</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  )}
+
+                  {["completed", "no_show"].includes(a.status) && (
+                    <RatingStars
+                      label={a.status === "no_show" ? "Rating pentru profesionist după no-show" : "Evaluează profesionistul"}
+                      compact
+                      onRate={(rating) => onRateApplicant(a, rating)}
+                    />
+                  )}
+
+                  {a.status !== "pending" && (
+                    <TouchableOpacity onPress={() => onMessageApplicant(a)} style={{ marginTop: 12, minHeight: 42, borderWidth: 1, borderColor: C.border, borderRadius: 12, alignItems: "center", justifyContent: "center", flexDirection: "row" }}>
+                      <Ionicons name="chatbubble-outline" size={18} color={C.gold} style={{ marginRight: 7 }} />
+                      <Text style={{ color: C.text, fontWeight: "800" }}>Mesaj</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              ))
+            )}
+          </>
+        )}
+      </ScreenScroll>
+    </Shell>
+  );
+}
+
+function NotificationsScreen({ notifications, onBack, onOpen }) {
+  return (
+    <Shell>
+      <ScreenScroll bottom={40}>
+        <BackButton onPress={onBack} />
+        <Title>Notificări</Title>
+        {notifications.length === 0 ? (
+          <EmptyCard icon="notifications-outline" title="Nu ai notificări" />
+        ) : (
+          notifications.map((n) => (
+            <TouchableOpacity key={n.id} onPress={() => onOpen(n)} activeOpacity={0.82} style={{ backgroundColor: C.panel2, borderRadius: 17, borderWidth: 1, borderColor: n.read_at ? C.border : C.gold, padding: 15, marginBottom: 11 }}>
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <View style={{ width: 42, height: 42, borderRadius: 13, backgroundColor: C.panel3, alignItems: "center", justifyContent: "center", marginRight: 12 }}>
+                  <Ionicons name="notifications-outline" size={20} color={C.gold} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: C.text, fontWeight: "900" }}>{n.title || "TuraX"}</Text>
+                  <Text style={{ color: C.muted, marginTop: 4, lineHeight: 19 }}>{n.body || ""}</Text>
+                </View>
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  {!n.read_at && <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: C.gold, marginRight: 8 }} />}
+                  <Ionicons name="chevron-forward" size={18} color={C.muted2} />
+                </View>
+              </View>
+            </TouchableOpacity>
+          ))
+        )}
+      </ScreenScroll>
+    </Shell>
+  );
+}

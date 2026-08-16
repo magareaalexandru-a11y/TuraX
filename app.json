@@ -1,16 +1,16 @@
 {
   "expo": {
-    "name": "turax",
+    "name": "TuraX",
     "slug": "snack-af0a9de1-9675-4459-b1c8-d7f0f860bed8",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#020B16"
     },
     "ios": {
       "supportsTablet": true
@@ -18,10 +18,11 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#020B16"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.alexmagarea.snackaf0a9de196754459b1c8d7f0f860bed8"
+      "package": "com.alexmagarea.snackaf0a9de196754459b1c8d7f0f860bed8",
+      "softwareKeyboardLayoutMode": "resize"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -34,7 +35,13 @@
     },
     "plugins": [
       "expo-sqlite",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "TuraX folosește fotografia aleasă doar pentru profilul tău sau logo-ul locației."
+        }
+      ]
     ]
   }
 }
