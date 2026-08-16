@@ -129,6 +129,7 @@ import ProfileScreen from "./src/screens/profile/ProfileScreen";
 import { useAuthActions } from "./src/hooks/useAuthActions";
 import { useCoreRealtimeSync } from "./src/hooks/useCoreRealtimeSync";
 import { useChatRealtime } from "./src/hooks/useChatRealtime";
+import { profileToForms } from "./src/utils/profileFormUtils";
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || "https://hfqijvzfjmuysuwdoxej.supabase.co";
 const SUPABASE_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || "sb_publishable_KJkUOxPP0_8JFtbTzWN0oA_qGA_gtcm";
 
@@ -322,38 +323,11 @@ export default function App() {
   }, [managerForm, profile, role]);
 
   const applyProfileToForms = (p) => {
-    if (!p) return;
+    const forms = profileToForms(p);
+    if (!forms) return;
 
-    const storedRoles = Array.isArray(p.worker_roles)
-      ? p.worker_roles
-      : [];
-
-    const customRole =
-      storedRoles.find((x) => !WORKER_ROLES.includes(x)) || "";
-
-    setWaiterForm({
-      fullName: p.full_name || "",
-      city: p.city || "",
-      experience:
-        p.experience !== null && p.experience !== undefined
-          ? String(p.experience)
-          : "",
-      description: p.description || "",
-      workerRoles: storedRoles.filter((x) => WORKER_ROLES.includes(x)),
-      customRoleEnabled: Boolean(customRole),
-      customWorkerRole: customRole,
-      workTypes: Array.isArray(p.work_types) ? p.work_types : [],
-      horecaSkills: Array.isArray(p.horeca_skills) ? p.horeca_skills : [],
-    });
-
-    setManagerForm({
-      locationName: p.location_name || "",
-      locationType: p.location_type || "",
-      locationCity: p.location_city || "",
-      locationAddress: p.location_address || "",
-      contactName: p.contact_name || "",
-      contactPhone: p.contact_phone || "",
-    });
+    setWaiterForm(forms.waiterForm);
+    setManagerForm(forms.managerForm);
   };
 
   const loadProfile = async (userId, chooseScreen = false) => {
