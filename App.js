@@ -123,6 +123,9 @@ import NotificationsScreen from "./src/screens/notifications/NotificationsScreen
 
 import ShiftDetailScreen from "./src/screens/shifts/ShiftDetailScreen";
 
+import ShiftsScreen from "./src/screens/shifts/ShiftsScreen";
+import ProfileScreen from "./src/screens/profile/ProfileScreen";
+
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || "https://hfqijvzfjmuysuwdoxej.supabase.co";
 const SUPABASE_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || "sb_publishable_KJkUOxPP0_8JFtbTzWN0oA_qGA_gtcm";
 
@@ -1869,97 +1872,4 @@ export default function App() {
   );
 
   return appScreen;
-}
-
-function ShiftsScreen({ role, shifts, query, setQuery, filter, setFilter, favorites, onFavorite, onOpenShift, refreshing, onRefresh }) {
-  const filterItems = role === "waiter" ? ["Toate", "Azi", "Mâine", "Weekend", "Favorite"] : ["Toate", "Active", "Ocupate", "Finalizate", "Anulate"];
-  return (
-    <Shell>
-      <ScreenScroll refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.gold} />} bottom={110}>
-        <Title subtitle={role === "waiter" ? "Caută după locație, oraș sau rol." : "Turele publicate de locația ta."}>{role === "waiter" ? "Ture disponibile" : "Turele mele"}</Title>
-        <Field icon="search-outline" value={query} onChangeText={setQuery} placeholder="Caută..." />
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }} keyboardShouldPersistTaps="handled">
-          {filterItems.map((x) => <Chip key={x} label={x} selected={filter === x} onPress={() => setFilter(x)} />)}
-        </ScrollView>
-        {shifts.length === 0 ? (
-          <EmptyCard title="Nicio tură găsită" text="Încearcă alt filtru sau revino mai târziu." />
-        ) : (
-          shifts.map((s) => (
-            <ShiftCard key={s.id} shift={s} showStatus={role === "manager"} favorite={favorites.includes(s.id)} onFavorite={role === "waiter" ? () => onFavorite(s.id) : null} onPress={() => onOpenShift(s)} />
-          ))
-        )}
-      </ScreenScroll>
-    </Shell>
-  );
-}
-
-// TURAX_HOTFIX_PICKER_3_1_2_1
-function ProfileScreen({ role, profile, shifts, acceptedShifts, onEdit, onNotifications, onSignOut, onDeleteAccount, deleteAccountBusy, onChangePhoto, photoBusy, onOpenShifts }) {
-  const manager = role === "manager";
-  const name = manager ? profile?.location_name || "Locație" : profile?.full_name || "Ospătar";
-  return (
-    <Shell>
-      <ScreenScroll bottom={110}>
-        <View style={{ alignItems: "center", marginTop: 12 }}>
-          <TouchableOpacity onPress={onChangePhoto} disabled={photoBusy} activeOpacity={0.82} style={{ position: "relative" }}>
-            <AvatarCircle uri={profile?.avatar_url} role={role} size={108} />
-            <View style={{ position: "absolute", right: -2, bottom: -2, width: 34, height: 34, borderRadius: 17, backgroundColor: C.gold, borderWidth: 3, borderColor: C.bg, alignItems: "center", justifyContent: "center" }}>
-              {photoBusy ? <ActivityIndicator size="small" color="#07111D" /> : <Ionicons name="camera-outline" size={18} color="#07111D" />}
-            </View>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={onChangePhoto} disabled={photoBusy} style={{ paddingVertical: 8 }}>
-            <Text style={{ color: C.gold, fontSize: 12, fontWeight: "800" }}>{profile?.avatar_url ? "Schimbă fotografia" : manager ? "Adaugă logo / fotografie" : "Adaugă fotografie"}</Text>
-          </TouchableOpacity>
-          <Text style={{ color: C.text, fontSize: 27, fontWeight: "900", marginTop: 5 }}>{name}</Text>
-          <Text style={{ color: C.gold, fontWeight: "800", marginTop: 5 }}>
-              {manager ? "Restaurant / angajator" : "Profesionist HoReCa"}
-            </Text>
-
-            {!manager &&
-              Array.isArray(profile?.worker_roles) &&
-              profile.worker_roles.length > 0 && (
-                <Text
-                  style={{
-                    color: C.muted,
-                    fontSize: 14,
-                    fontWeight: "700",
-                    marginTop: 7,
-                    textAlign: "center",
-                    lineHeight: 20,
-                  }}
-                >
-                  {profile.worker_roles.join(" · ")}
-                </Text>
-              )}
-        </View>
-
-        <View style={{ flexDirection: "row", marginTop: 24 }}>
-          <TouchableOpacity onPress={onOpenShifts} activeOpacity={0.82} style={{ flex: 1, backgroundColor: C.panel2, borderRadius: 18, borderWidth: 1, borderColor: C.border, padding: 15, marginRight: 7, alignItems: "center" }}>
-            <Text style={{ color: C.gold, fontSize: 24, fontWeight: "900" }}>{manager ? shifts.length : acceptedShifts.length}</Text>
-            <Text style={{ color: C.muted, fontSize: 12, marginTop: 4 }}>{manager ? "Ture publicate" : "Ture confirmate"}</Text>
-          </TouchableOpacity>
-          <View style={{ flex: 1, backgroundColor: C.panel2, borderRadius: 18, borderWidth: 1, borderColor: C.border, padding: 15, marginLeft: 7, alignItems: "center" }}>
-            <Text style={{ color: C.gold, fontSize: 24, fontWeight: "900" }}>{profile?.rating ? Number(profile.rating).toFixed(1) : "—"}</Text>
-            <Text style={{ color: C.muted, fontSize: 12, marginTop: 4 }}>Rating</Text>
-          </View>
-        </View>
-
-        <Button label="Editează profilul" secondary icon="create-outline" onPress={onEdit} style={{ marginTop: 20 }} />
-        <Button label="Notificări" secondary icon="notifications-outline" onPress={onNotifications} style={{ marginTop: 12 }} />
-        <Button label="Deconectare" danger icon="log-out-outline" onPress={onSignOut} style={{ marginTop: 24 }} />
-
-      <Button
-        label={deleteAccountBusy ? "Se șterge..." : "Șterge contul"}
-        danger
-        icon="trash-outline"
-        onPress={onDeleteAccount}
-        disabled={deleteAccountBusy}
-        style={{
-          marginTop: 12,
-          opacity: deleteAccountBusy ? 0.6 : 1,
-        }}
-      />
-      </ScreenScroll>
-    </Shell>
-  );
 }
