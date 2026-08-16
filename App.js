@@ -33,6 +33,27 @@ import { createClient } from "@supabase/supabase-js";
 
 import { C, WORK_TYPES, SKILLS, SHIFT_ROLES, WORKER_ROLES, TIME_SLOTS } from "./src/constants/appConstants";
 
+import {
+  localIsoDate,
+  todayIso,
+  MIN_PUBLISH_LEAD_MS,
+  isPublishStartAllowed,
+  formatHorecaText,
+  addDaysIso,
+  shiftStartDate,
+  canCancelConfirmedShift,
+  shiftEndDate,
+  hasShiftEnded,
+  isEmail,
+  cleanPhone,
+  sameDay,
+  messageDayLabel,
+  messageTime,
+  conversationTime,
+  formatDateRo,
+  money,
+} from "./src/utils/appUtils";
+
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || "https://hfqijvzfjmuysuwdoxej.supabase.co";
 const SUPABASE_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || "sb_publishable_KJkUOxPP0_8JFtbTzWN0oA_qGA_gtcm";
 
@@ -44,95 +65,6 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
     detectSessionInUrl: false,
   },
 });
-
-const localIsoDate = (date = new Date()) => {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-};
-const todayIso = () => localIsoDate(new Date());
-const MIN_PUBLISH_LEAD_MS = 60 * 60 * 1000;
-const isPublishStartAllowed = (date, time) => {
-  if (!date || !time) return false;
-  const start = new Date(`${date}T${String(time).slice(0, 5)}:00`);
-  return Number.isFinite(start.getTime()) && start.getTime() >= Date.now() + MIN_PUBLISH_LEAD_MS;
-};
-const formatHorecaText = (value) => String(value || "")
-  .replace(/(\d+)\s*pers\b/gi, "$1 persoane")
-  .replace(/^Eveniment\s+(\d+\s+persoane)$/i, "Eveniment · $1");
-const addDaysIso = (n) => {
-  const d = new Date();
-  d.setDate(d.getDate() + n);
-  return localIsoDate(d);
-};
-const shiftStartDate = (shift) => {
-  if (!shift) return null;
-  if (shift.starts_at) return new Date(shift.starts_at);
-  if (shift.shift_date && shift.start_time) {
-    return new Date(`${shift.shift_date}T${String(shift.start_time).slice(0, 5)}:00`);
-  }
-  return null;
-};
-const canCancelConfirmedShift = (shift) => {
-  const start = shiftStartDate(shift);
-  return !!start && start.getTime() - Date.now() > 48 * 60 * 60 * 1000;
-};
-const shiftEndDate = (shift) => {
-  if (!shift) return null;
-  if (shift.ends_at) return new Date(shift.ends_at);
-  if (shift.shift_date && shift.start_time && shift.end_time) {
-    const start = new Date(`${shift.shift_date}T${String(shift.start_time).slice(0, 5)}:00`);
-    const end = new Date(`${shift.shift_date}T${String(shift.end_time).slice(0, 5)}:00`);
-    if (end <= start) end.setDate(end.getDate() + 1);
-    return end;
-  }
-  return null;
-};
-const hasShiftEnded = (shift) => {
-  const end = shiftEndDate(shift);
-  return !!end && end.getTime() <= Date.now();
-};
-const isEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
-const cleanPhone = (value) => value.replace(/[^\d+]/g, "");
-const sameDay = (a, b) => {
-  const da = new Date(a);
-  const db = new Date(b);
-  return da.getFullYear() === db.getFullYear() && da.getMonth() === db.getMonth() && da.getDate() === db.getDate();
-};
-const messageDayLabel = (value) => {
-  if (!value) return "";
-  const d = new Date(value);
-  const today = new Date();
-  const yesterday = new Date();
-  yesterday.setDate(today.getDate() - 1);
-  if (sameDay(d, today)) return "Astăzi";
-  if (sameDay(d, yesterday)) return "Ieri";
-  return d.toLocaleDateString("ro-RO", { day: "numeric", month: "short", year: d.getFullYear() === today.getFullYear() ? undefined : "numeric" });
-};
-const messageTime = (value) => value ? new Date(value).toLocaleTimeString("ro-RO", { hour: "2-digit", minute: "2-digit" }) : "";
-const conversationTime = (value) => {
-  if (!value) return "";
-  const d = new Date(value);
-  const today = new Date();
-  if (sameDay(d, today)) return messageTime(value);
-  return d.toLocaleDateString("ro-RO", { day: "numeric", month: "short" });
-};
-
-function formatDateRo(value) {
-  if (!value) return "";
-  const d = new Date(`${value}T12:00:00`);
-  return d.toLocaleDateString("ro-RO", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-  });
-}
-
-function money(value) {
-  const n = Number(value || 0);
-  return Number.isFinite(n) ? `${n.toFixed(0)} lei` : "";
-}
 
 function Shell({ children }) {
   const androidTop = Platform.OS === "android" ? StatusBar.currentHeight || 0 : 0;
