@@ -95,3 +95,13 @@ export function shiftStatusLabel(status) {
   if (status === "completed") return "Finalizată";
   return status || "—";
 }
+
+export function applicationStatusLabel(status) {
+  if (status === "pending") return "În așteptare";
+  if (status === "accepted") return "Confirmată";
+  if (status === "rejected") return "Respinsă";
+  if (status === "cancelled") return "Anulată";
+  if (status === "completed") return "Finalizată";
+  if (status === "no_show") return "Neprezentare";
+  return status || "—";
+}

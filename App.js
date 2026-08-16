@@ -6,11 +6,15 @@
 // Upgrade 3.1.2: UX publicare, navigare si catalog profesionisti
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
-import { decode } from "base64-arraybuffer";
+import {
+  decode } from "base64-arraybuffer";
 import { Picker } from "@react-native-picker/picker";
 import "react-native-url-polyfill/auto";
 import { Calendar } from "react-native-calendars";
-import React, { useEffect, useMemo, useState } from "react";
+import React,
+  { useEffect,
+  useMemo,
+  useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import {
   ActivityIndicator,
@@ -28,10 +32,15 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-} from "react-native";
+  } from "react-native";
 import { createClient } from "@supabase/supabase-js";
 
-import { C, WORK_TYPES, SKILLS, SHIFT_ROLES, WORKER_ROLES, TIME_SLOTS } from "./src/constants/appConstants";
+import { C,
+  WORK_TYPES,
+  SKILLS,
+  SHIFT_ROLES,
+  WORKER_ROLES,
+  TIME_SLOTS } from "./src/constants/appConstants";
 
 import {
   localIsoDate,
@@ -53,6 +62,7 @@ import {
   formatDateRo,
   money,
   shiftStatusLabel,
+  applicationStatusLabel,
 } from "./src/utils/appUtils";
 
 import {
@@ -1948,16 +1958,6 @@ function ProfileScreen({ role, profile, shifts, acceptedShifts, onEdit, onNotifi
       </ScreenScroll>
     </Shell>
   );
-}
-
-function applicationStatusLabel(status) {
-  if (status === "pending") return "În așteptare";
-  if (status === "accepted") return "Confirmată";
-  if (status === "rejected") return "Respinsă";
-  if (status === "cancelled") return "Anulată";
-  if (status === "completed") return "Finalizată";
-  if (status === "no_show") return "Neprezentare";
-  return status || "—";
 }
 
 function ShiftInfoRow({ icon, children }) {

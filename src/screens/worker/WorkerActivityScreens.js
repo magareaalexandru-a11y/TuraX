@@ -6,9 +6,18 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { C } from "../../constants/appConstants";
-import { Shell, ScreenScroll, Title, BackButton, EmptyCard } from "../../components/ui/BasicUI";
+import { Shell,
+  ScreenScroll,
+  Title,
+  BackButton,
+  EmptyCard } from "../../components/ui/BasicUI";
 import { RatingStars } from "../../components/ui/FeedbackUI";
-import { formatDateRo, money, hasShiftEnded, canCancelConfirmedShift } from "../../utils/appUtils";
+import { formatDateRo,
+  money,
+  hasShiftEnded,
+  canCancelConfirmedShift,
+  applicationStatusLabel,
+} from "../../utils/appUtils";
 
 export function MyWaiterActivityScreen({
   availabilities,
