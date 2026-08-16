@@ -128,6 +128,7 @@ import ProfileScreen from "./src/screens/profile/ProfileScreen";
 
 import { useAuthActions } from "./src/hooks/useAuthActions";
 import { useCoreRealtimeSync } from "./src/hooks/useCoreRealtimeSync";
+import { useChatRealtime } from "./src/hooks/useChatRealtime";
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || "https://hfqijvzfjmuysuwdoxej.supabase.co";
 const SUPABASE_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || "sb_publishable_KJkUOxPP0_8JFtbTzWN0oA_qGA_gtcm";
 
@@ -466,30 +467,11 @@ export default function App() {
     setShiftFilter("Toate");
   }, [role]);
 
-  useEffect(() => {
-    if (!chatConversation?.id) return;
-    const channel = supabase
-      .channel(`messages:${chatConversation.id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "messages",
-          filter: `conversation_id=eq.${chatConversation.id}`,
-        },
-        (payload) => {
-          setChatMessages((prev) =>
-            prev.some((m) => m.id === payload.new.id) ? prev : [...prev, payload.new]
-          );
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [chatConversation?.id]);
+  useChatRealtime({
+    supabase,
+    chatConversation,
+    setChatMessages,
+  });
 
   const {
     handleLogin,
