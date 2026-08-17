@@ -5,87 +5,23 @@
 // TURAX_UPGRADE_3_1_2
 // Upgrade 3.1.2: UX publicare, navigare si catalog profesionisti
 
-import {
-  decode } from "base64-arraybuffer";
-import { Picker } from "@react-native-picker/picker";
+
+
 import "react-native-url-polyfill/auto";
-import { Calendar } from "react-native-calendars";
-import React,
-  { useEffect,
-  useMemo,
-  useState } from "react";
-import { Ionicons } from "@expo/vector-icons";
-import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  Keyboard,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  RefreshControl,
-  SafeAreaView,
-  ScrollView,
-  StatusBar,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-  } from "react-native";
 
-import { C,
-  WORK_TYPES,
-  SKILLS,
-  SHIFT_ROLES,
-  WORKER_ROLES,
-  TIME_SLOTS } from "./src/constants/appConstants";
+import { useEffect, useMemo } from "react";
 
-import {
-  localIsoDate,
-  todayIso,
-  MIN_PUBLISH_LEAD_MS,
-  isPublishStartAllowed,
-  formatHorecaText,
-  addDaysIso,
-  shiftStartDate,
-  canCancelConfirmedShift,
-  shiftEndDate,
-  hasShiftEnded,
-  isEmail,
-  cleanPhone,
-  sameDay,
-  messageDayLabel,
-  messageTime,
-  conversationTime,
-  formatDateRo,
-  money,
-  shiftStatusLabel,
-  applicationStatusLabel,
-} from "./src/utils/appUtils";
+import { ActivityIndicator, Text, View } from "react-native";
 
-import {
-  Shell,
-  ScreenScroll,
-  Title,
-  BackButton,
-  Field,
-  Button,
-  Chip,
-  ErrorBox,
-} from "./src/components/ui/BasicUI";
+import { C } from "./src/constants/appConstants";
 
-import {
-  TuraXNotice,
-  TuraXConfirm,
-  RatingStars,
-  AvatarCircle,
-  EmptyCard,
-} from "./src/components/ui/FeedbackUI";
+import { isPublishStartAllowed, shiftStartDate, isEmail, formatDateRo, applicationStatusLabel } from "./src/utils/appUtils";
 
-import {
-  BottomNav,
-  ClocheLogo,
-} from "./src/components/navigation/AppNavigation";
+import { Shell } from "./src/components/ui/BasicUI";
+
+
+
+
 
 import { RoleScreen } from "./src/screens/onboarding/RoleScreen";
 
@@ -94,7 +30,7 @@ import { RoleScreen } from "./src/screens/onboarding/RoleScreen";
 
 
 
-import ShiftCard from "./src/components/shifts/ShiftCard";
+
 
 
 
@@ -117,8 +53,8 @@ import { useAppBootstrap } from "./src/hooks/useAppBootstrap";
 import { useCoreDataActions } from "./src/hooks/useCoreDataActions";
 import { useChatRealtime } from "./src/hooks/useChatRealtime";
 import { useMessagingActions } from "./src/hooks/useMessagingActions";
-import { profileToForms } from "./src/utils/profileFormUtils";
-import { buildWaiterProfileSave, buildManagerProfileSave } from "./src/utils/profileSaveUtils";
+
+
 import { filterShifts } from "./src/utils/shiftFilterUtils";
 import { useShiftActions } from "./src/hooks/useShiftActions";
 import { useApplicationActions } from "./src/hooks/useApplicationActions";
