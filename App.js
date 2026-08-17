@@ -450,6 +450,30 @@ export default function App() {
       requestProfileBack={requestProfileBack}
       saveManagerProfile={saveManagerProfile}
       saveWaiterProfile={saveWaiterProfile}
+      acceptedShifts={acceptedShifts}
+      applyToShift={applyToShift}
+      availabilities={availabilities}
+      cancelShiftByManager={cancelShiftByManager}
+      conversations={conversations}
+      handleSignOut={handleSignOut}
+      markAttendance={markAttendance}
+      myAvailabilities={myAvailabilities}
+      openConversation={openConversation}
+      openNotification={openNotification}
+      openShift={openShift}
+      openWaiterDirectory={openWaiterDirectory}
+      openWorkerPublicProfile={openWorkerPublicProfile}
+      pickProfilePhoto={pickProfilePhoto}
+      publishAvailability={publishAvailability}
+      publishError={publishError}
+      publishShift={publishShift}
+      refresh={refresh}
+      setDayAvailability={setDayAvailability}
+      setProfileBackTarget={setProfileBackTarget}
+      setShiftForm={setShiftForm}
+      setWorkerProfileError={setWorkerProfileError}
+      shiftForm={shiftForm}
+      submitShiftRating={submitShiftRating}
     />
   );
 
