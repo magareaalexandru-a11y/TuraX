@@ -48,8 +48,9 @@ export function useAppBootstrap({
 
       const {
         data: { subscription },
-      } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      } = supabase.auth.onAuthStateChange((event, nextSession) => {
         if (!mounted) return;
+        if (event === "INITIAL_SESSION") return;
         if (!nextSession) {
           setSession(null);
           setRole(null);
