@@ -22,7 +22,11 @@
       },
       "edgeToEdgeEnabled": true,
       "package": "com.alexmagarea.snackaf0a9de196754459b1c8d7f0f860bed8",
-      "softwareKeyboardLayoutMode": "resize"
+      "softwareKeyboardLayoutMode": "resize",
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -42,6 +46,12 @@
           "photosPermission": "TuraX folosește fotografia aleasă doar pentru profilul tău sau logo-ul locației."
         }
       ]
-    ]
+    ],
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/d1694935-4e6d-4d2c-9b23-ee8ca8bb451d"
+    }
   }
 }
