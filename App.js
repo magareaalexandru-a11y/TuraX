@@ -592,6 +592,7 @@ export default function App() {
     openWorkerPublicProfile,
     reloadSelectedShift,
     applyToShift,
+    publishShift,
   } = useShiftActions({
     supabase,
     currentUserId,
@@ -617,6 +618,12 @@ export default function App() {
     shiftStartDate,
     refreshCoreData,
     applicationStatusLabel,
+    shiftForm,
+    setShiftForm,
+    setPublishError,
+    setPublishBusy,
+    isPublishStartAllowed,
+    formatDateRo,
   });
 
   const {
@@ -644,77 +651,6 @@ export default function App() {
     selectedShift,
     reloadSelectedShift,
   });
-
-  const publishShift = async () => {
-    if (publishBusy) return;
-    setPublishError("");
-    const needed = Number(shiftForm.workersNeeded);
-    const rate = Number(shiftForm.hourlyRate);
-    const effectiveRole =
-      shiftForm.role === "Altele"
-        ? String(shiftForm.customRole || "").trim()
-        : String(shiftForm.role || "").trim();
-
-    if (!effectiveRole) {
-      return setPublishError("Alege rolul căutat.");
-    }
-
-    if (shiftForm.role === "Altele" && effectiveRole.length < 2) {
-      return setPublishError("Specifică rolul necesar.");
-    }
-
-    if (effectiveRole.length > 60) {
-      return setPublishError("Denumirea rolului poate avea maximum 60 de caractere.");
-    }
-
-    if (!shiftForm.locationName.trim()) return setPublishError("Completează numele locației.");
-    if (!shiftForm.city.trim()) return setPublishError("Completează orașul.");
-    if (!shiftForm.date) return setPublishError("Selectează data turei.");
-    if (!shiftForm.start || !shiftForm.end) return setPublishError("Selectează intervalul orar.");
-    if (!Number.isInteger(needed) || needed < 1) return setPublishError("Numărul de persoane necesare trebuie să fie cel puțin 1.");
-    if (!Number.isFinite(rate) || rate <= 0) return setPublishError("Introdu un tarif orar valid.");
-
-    if (!isPublishStartAllowed(shiftForm.date, shiftForm.start)) {
-      return setPublishError("Tura trebuie să înceapă cu cel puțin 60 de minute de acum.");
-    }
-
-    setPublishBusy(true);
-    try {
-      const { error } = await supabase.rpc("publish_shift", {
-        p_role: effectiveRole,
-        p_location_name: shiftForm.locationName.trim(),
-        p_city: shiftForm.city.trim(),
-        p_address: shiftForm.address.trim() || null,
-        p_shift_date: shiftForm.date,
-        p_start_time: shiftForm.start,
-        p_end_time: shiftForm.end,
-        p_workers_needed: needed,
-        p_hourly_rate: rate,
-        p_description: shiftForm.description.trim() || null,
-      });
-
-      if (error) return setPublishError(error.message);
-
-      setShiftForm({
-        role: "Ospătar",
-        customRole: "",
-        locationName: profile?.location_name || "",
-        city: profile?.location_city || "",
-        address: profile?.location_address || "",
-        date: "",
-        start: "",
-        end: "",
-        workersNeeded: "1",
-        hourlyRate: "",
-        description: "",
-      });
-      await refreshCoreData(true);
-      showNotice("Tura a fost publicată.");
-      setScreen("home");
-    } finally {
-      setPublishBusy(false);
-    }
-  };
 
   const {
     openConversation,
