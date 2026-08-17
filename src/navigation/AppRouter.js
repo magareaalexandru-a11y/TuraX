@@ -7,6 +7,7 @@ import {
   WorkerPublicProfileScreen,
   AvailableWaitersScreen,
   ManagerProfileScreen,
+  WaiterProfileScreen,
 } from "../screens/onboarding/ProfileScreens";
 
 import HomeScreen from "../screens/home/HomeScreen";
@@ -74,9 +75,12 @@ export default function AppRouter({
   openConversationFromList,
   managerForm,
   setManagerForm,
+  waiterForm,
+  setWaiterForm,
   formError,
   requestProfileBack,
-  saveManagerProfile
+  saveManagerProfile,
+  saveWaiterProfile
 }) {
   const appScreen = (
 <View style={{ flex: 1, backgroundColor: C.bg }}>
@@ -113,6 +117,16 @@ export default function AppRouter({
           onBrowseWaiters={openWaiterDirectory}
           onMyActivity={() => setScreen("myActivity")}
           onConfirmedShifts={() => setScreen("confirmedShifts")}
+        />
+      )}
+
+      {screen === "waiterProfile" && (
+        <WaiterProfileScreen
+          form={waiterForm}
+          setForm={setWaiterForm}
+          error={formError}
+          onBack={() => requestProfileBack("waiter")}
+          onSave={saveWaiterProfile}
         />
       )}
 
