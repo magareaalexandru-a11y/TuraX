@@ -395,7 +395,6 @@ export default function App() {
       setScreen={setScreen}
       role={role}
       profile={profile}
-      conversation={conversation}
       chatConversation={chatConversation}
       chatMessages={chatMessages}
       chatText={chatText}
