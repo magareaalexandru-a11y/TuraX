@@ -1,4 +1,4 @@
-import { cleanPhone } from "../constants/appConstants";
+import { cleanPhone } from "./appUtils";
 
 const uniqueCaseInsensitive = (values = []) =>
   values
