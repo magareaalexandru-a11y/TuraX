@@ -37,6 +37,10 @@ function ShiftInfoRow({ icon, children }) {
   );
 }
 
+import { applicationStatusLabel } from "../../utils/appUtils";
+
+const formatHorecaText = (value) => String(value ?? "");
+
 export default function ShiftDetailScreen({
   role,
   shift,

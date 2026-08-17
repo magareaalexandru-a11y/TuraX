@@ -399,10 +399,12 @@ export default function App() {
       chatMessages={chatMessages}
       chatText={chatText}
       setChatText={setChatText}
+        sendMessage={sendMessage}
       currentUserId={currentUserId}
       notice={notice}
       confirmDialog={confirmDialog}
       setConfirmDialog={setConfirmDialog}
+      executeConfirm={executeConfirm}
       shifts={shifts}
       filteredShifts={filteredShifts}
       shiftFilter={shiftFilter}

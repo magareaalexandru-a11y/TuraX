@@ -1,4 +1,9 @@
+import { C } from "../constants/appConstants";
+import { ChatScreen } from "../screens/messages/MessagesScreen";
 import React from "react";
+import { View } from "react-native";
+import { BottomNav } from "../components/navigation/AppNavigation";
+import { TuraXNotice, TuraXConfirm } from "../components/ui/FeedbackUI";
 
 import {
   AvailabilityScreen,
@@ -32,10 +37,12 @@ export default function AppRouter({
   chatMessages,
   chatText,
   setChatText,
+  sendMessage,
   currentUserId,
   notice,
   confirmDialog,
   setConfirmDialog,
+  executeConfirm,
   shifts,
   filteredShifts,
   shiftFilter,

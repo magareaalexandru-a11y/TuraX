@@ -19,6 +19,8 @@ import { formatDateRo,
   applicationStatusLabel,
 } from "../../utils/appUtils";
 
+import ShiftCard from "../../components/shifts/ShiftCard";
+
 export function MyWaiterActivityScreen({
   availabilities,
   applications,

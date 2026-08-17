@@ -25,6 +25,8 @@ import {
   EmptyCard,
 } from "../../components/ui/FeedbackUI";
 
+import { money } from "../../utils/appUtils";
+
 export function WaiterDirectoryScreen({ rows, loading, error, onBack, onMessage, onOpenProfile }) {
   const [query, setQuery] = useState("");
   const q = query.trim().toLowerCase();

@@ -17,6 +17,7 @@ import {
   EmptyCard,
 } from "../../components/ui/BasicUI";
 import ShiftCard from "../../components/shifts/ShiftCard";
+import { hasShiftEnded } from "../../utils/appUtils";
 
 export default function HomeScreen({
   role,
