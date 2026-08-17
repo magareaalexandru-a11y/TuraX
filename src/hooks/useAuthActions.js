@@ -1,3 +1,4 @@
+import { Alert } from "react-native";
 export function useAuthActions({
   supabase,
   AsyncStorage,
@@ -14,6 +15,8 @@ export function useAuthActions({
   setRole,
   setScreen,
   setAuthPassword,
+  deleteAccountBusy,
+  setDeleteAccountBusy,
 }) {
   const handleLogin = async () => {
     setAuthMessage("");
@@ -86,10 +89,107 @@ export function useAuthActions({
     setAuthPassword("");
   };
 
+  const handleDeleteAccount = () => {
+    if (deleteAccountBusy) return;
+
+    Alert.alert(
+      "Șterge contul?",
+      "Contul și datele asociate vor fi șterse definitiv.",
+      [
+        {
+          text: "Renunță",
+          style: "cancel",
+        },
+        {
+          text: "Continuă",
+          style: "destructive",
+          onPress: () => {
+            Alert.alert(
+              "Ștergere definitivă",
+              "Această acțiune nu poate fi anulată. Ești sigur că vrei să ștergi definitiv contul?",
+              [
+                {
+                  text: "Renunță",
+                  style: "cancel",
+                },
+                {
+                  text: "Șterge definitiv",
+                  style: "destructive",
+                  onPress: async () => {
+                    if (deleteAccountBusy) return;
+
+                    setDeleteAccountBusy(true);
+
+                    try {
+                      const { data, error } = await supabase.functions.invoke(
+                        "delete-account",
+                        {
+                          body: { confirm: true },
+                        }
+                      );
+
+                      if (error) {
+                        let message =
+                          error.message ||
+                          "Contul nu a putut fi șters.";
+
+                        try {
+                          const payload =
+                            typeof error?.context?.json === "function"
+                              ? await error.context.json()
+                              : null;
+
+                          if (payload?.error) {
+                            message = payload.error;
+                          }
+                        } catch (_) {}
+
+                        throw new Error(message);
+                      }
+
+                      if (!data?.success) {
+                        throw new Error(
+                          data?.error ||
+                            "Contul nu a putut fi șters."
+                        );
+                      }
+
+                      await supabase.auth.signOut({ scope: "local" });
+
+                      setSession(null);
+                      setProfile(null);
+                      setRole(null);
+                      setScreen("home");
+                      setAuthPassword("");
+
+                      Alert.alert(
+                        "Cont șters",
+                        "Contul tău a fost șters definitiv."
+                      );
+                    } catch (error) {
+                      Alert.alert(
+                        "Ștergerea nu a reușit",
+                        error?.message ||
+                          "A apărut o eroare la ștergerea contului."
+                      );
+                    } finally {
+                      setDeleteAccountBusy(false);
+                    }
+                  },
+                },
+              ]
+            );
+          },
+        },
+      ]
+    );
+  };
+
   return {
     handleLogin,
     handleSignup,
     resetPassword,
     handleSignOut,
+    handleDeleteAccount,
   };
 }
