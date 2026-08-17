@@ -6,14 +6,20 @@ import { BottomNav } from "../components/navigation/AppNavigation";
 import { TuraXNotice, TuraXConfirm } from "../components/ui/FeedbackUI";
 
 import {
-  AvailabilityScreen,
-  PublishShiftScreen,
-  WaiterDirectoryScreen,
-  WorkerPublicProfileScreen,
-  AvailableWaitersScreen,
   ManagerProfileScreen,
   WaiterProfileScreen,
 } from "../screens/onboarding/ProfileScreens";
+
+import {
+  AvailabilityScreen,
+  PublishShiftScreen,
+} from "../screens/publishing/PublishingScreens";
+
+import {
+  WaiterDirectoryScreen,
+  WorkerPublicProfileScreen,
+  AvailableWaitersScreen,
+} from "../screens/professionals/ProfessionalScreens";
 
 import HomeScreen from "../screens/home/HomeScreen";
 import MessagesScreen from "../screens/messages/MessagesScreen";

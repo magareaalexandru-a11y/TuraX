@@ -1,6 +1,6 @@
 import React from "react";
 import { Image, Text, TouchableOpacity, View } from "react-native";
-import { Ionicons as Icons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 
 import { C } from "../../constants/appConstants";
 import {

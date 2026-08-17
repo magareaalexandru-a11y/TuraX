@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { Ionicons as Icons } from "@expo/vector-icons";
 
 import { C } from "../../constants/appConstants";
 import {
@@ -14,8 +13,8 @@ import {
   ScreenScroll,
   Button,
   ErrorBox,
-  EmptyCard,
 } from "../../components/ui/BasicUI";
+import { EmptyCard } from "../../components/ui/FeedbackUI";
 import ShiftCard from "../../components/shifts/ShiftCard";
 import { hasShiftEnded } from "../../utils/appUtils";
 import { Ionicons } from "@expo/vector-icons";
