@@ -90,39 +90,28 @@ import {
 } from "./src/components/navigation/AppNavigation";
 
 import { RoleScreen } from "./src/screens/onboarding/RoleScreen";
-import {
-} from "./src/screens/onboarding/ProfileScreens";
 
-import {
-  PickerBox,
-  TimePickerBox,
-  DarkCalendar,
-  AvailabilityScreen,
-  PublishShiftScreen,
-} from "./src/screens/publishing/PublishingScreens";
 
-import {
-  WaiterDirectoryScreen,
-  WorkerPublicProfileScreen,
-  AvailableWaitersScreen,
-} from "./src/screens/professionals/ProfessionalScreens";
+
+
+
 
 import ShiftCard from "./src/components/shifts/ShiftCard";
 
-import HomeScreen from "./src/screens/home/HomeScreen";
+
 
 import AuthScreen from "./src/screens/auth/AuthScreen";
 
-import { MessagesScreen, ChatScreen } from "./src/screens/messages/MessagesScreen";
 
-import { MyWaiterActivityScreen, ConfirmedShiftsScreen } from "./src/screens/worker/WorkerActivityScreens";
 
-import NotificationsScreen from "./src/screens/notifications/NotificationsScreen";
 
-import ShiftDetailScreen from "./src/screens/shifts/ShiftDetailScreen";
 
-import ShiftsScreen from "./src/screens/shifts/ShiftsScreen";
-import ProfileScreen from "./src/screens/profile/ProfileScreen";
+
+
+
+
+
+
 
 import { useAuthActions } from "./src/hooks/useAuthActions";
 import { useCoreRealtimeSync } from "./src/hooks/useCoreRealtimeSync";
