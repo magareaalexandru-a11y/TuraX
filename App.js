@@ -47,6 +47,7 @@ import AuthScreen from "./src/screens/auth/AuthScreen";
 
 
 
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuthActions } from "./src/hooks/useAuthActions";
 import { useCoreRealtimeSync } from "./src/hooks/useCoreRealtimeSync";
 import { useAppBootstrap } from "./src/hooks/useAppBootstrap";
