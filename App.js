@@ -4,7 +4,6 @@
 // TURAX_HOTFIX_CUSTOM_ROLE_3_1_2_2
 // TURAX_UPGRADE_3_1_2
 // Upgrade 3.1.2: UX publicare, navigare si catalog profesionisti
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
 import {
   decode } from "base64-arraybuffer";
@@ -33,7 +32,6 @@ import {
   TouchableOpacity,
   View,
   } from "react-native";
-import { createClient } from "@supabase/supabase-js";
 
 import { C,
   WORK_TYPES,
@@ -124,18 +122,8 @@ import { useApplicationActions } from "./src/hooks/useApplicationActions";
 import { useProfileActions } from "./src/hooks/useProfileActions";
 
 import AppRouter from "./src/navigation/AppRouter";
+import { supabase } from "./src/lib/supabase";
 
-const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || "https://hfqijvzfjmuysuwdoxej.supabase.co";
-const SUPABASE_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || "sb_publishable_KJkUOxPP0_8JFtbTzWN0oA_qGA_gtcm";
-
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
-  auth: {
-    storage: AsyncStorage,
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: false,
-  },
-});
 
 export default function App() {
   const [booting, setBooting] = useState(true);
