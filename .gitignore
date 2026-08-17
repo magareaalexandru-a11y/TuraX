@@ -41,3 +41,6 @@ yarn-error.*
 /android
 .dev-archive/
 .vscode/
+
+# Local Android builds
+*.apk
