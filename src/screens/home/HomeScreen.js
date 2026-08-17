@@ -18,6 +18,7 @@ import {
 } from "../../components/ui/BasicUI";
 import ShiftCard from "../../components/shifts/ShiftCard";
 import { hasShiftEnded } from "../../utils/appUtils";
+import { Ionicons } from "@expo/vector-icons";
 
 export default function HomeScreen({
   role,
