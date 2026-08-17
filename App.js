@@ -92,7 +92,6 @@ import {
 import { RoleScreen } from "./src/screens/onboarding/RoleScreen";
 import {
   WaiterProfileScreen,
-  ManagerProfileScreen,
 } from "./src/screens/onboarding/ProfileScreens";
 
 import {
@@ -1091,23 +1090,6 @@ export default function App() {
       </View>
     );
   }
-
-  if (screen === "managerProfile") {
-    return (
-      <View style={{ flex: 1, backgroundColor: C.bg }}>
-        <ManagerProfileScreen
-          form={managerForm}
-          setForm={setManagerForm}
-          error={formError}
-          onBack={() => requestProfileBack("manager")}
-          onSave={saveManagerProfile}
-        />
-        <TuraXNotice notice={notice} />
-        <TuraXConfirm dialog={confirmDialog} onCancel={() => setConfirmDialog(null)} onConfirm={executeConfirm} />
-      </View>
-    );
-  }
-
   const appScreen = (
     <AppRouter
       screen={screen}
@@ -1160,6 +1142,11 @@ export default function App() {
       shiftBackTarget={shiftBackTarget}
       withdrawAvailability={withdrawAvailability}
       openConversationFromList={openConversationFromList}
+      managerForm={managerForm}
+      setManagerForm={setManagerForm}
+      formError={formError}
+      requestProfileBack={requestProfileBack}
+      saveManagerProfile={saveManagerProfile}
     />
   );
 
