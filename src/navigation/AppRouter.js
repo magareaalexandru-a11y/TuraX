@@ -38,7 +38,6 @@ export default function AppRouter({
   setScreen,
   role,
   profile,
-  conversation,
   chatConversation,
   chatMessages,
   chatText,
