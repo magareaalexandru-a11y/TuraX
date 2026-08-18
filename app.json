@@ -45,7 +45,8 @@
         {
           "photosPermission": "TuraX folosește fotografia aleasă doar pentru profilul tău sau logo-ul locației."
         }
-      ]
+      ],
+      "@react-native-vector-icons/ionicons"
     ],
     "runtimeVersion": {
       "policy": "appVersion"

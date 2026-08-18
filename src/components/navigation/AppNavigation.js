@@ -4,7 +4,7 @@ import {
   Text,
   TouchableOpacity,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons } from "../ui/TuraXIcon";
 import { C } from "../../constants/appConstants";
 
 export function BottomNav({ screen, setScreen }) {

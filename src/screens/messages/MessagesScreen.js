@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
   View
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons } from "../../components/ui/TuraXIcon";
 import { C } from "../../constants/appConstants";
 import { Shell, ScreenScroll, Title } from "../../components/ui/BasicUI";
 import { AvatarCircle, EmptyCard } from "../../components/ui/FeedbackUI";

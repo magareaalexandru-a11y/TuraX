@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
   Image,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons } from "./TuraXIcon";
 import { C } from "../../constants/appConstants";
 
 export function TuraXNotice({ notice }) {

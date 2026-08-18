@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons } from "../../components/ui/TuraXIcon";
 import { Calendar } from "react-native-calendars";
 
 import {
