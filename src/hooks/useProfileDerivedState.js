@@ -45,6 +45,7 @@ export function useProfileDerivedState({
       const current = {
         fullName: profile.full_name || "",
         city: profile.city || "",
+      address: profile.location_address || "",
         experience:
           profile.experience !== null && profile.experience !== undefined
             ? String(profile.experience)

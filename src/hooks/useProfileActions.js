@@ -130,6 +130,8 @@ export function useProfileActions({
       return;
     }
 
+    payload.location_address = String(waiterForm.address || "").trim() || null;
+
     const { data, error } = await supabase
       .from("profiles")
       .upsert(payload, { onConflict: "id" })

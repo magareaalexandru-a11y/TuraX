@@ -18,6 +18,7 @@ import {
   Chip,
   Button,
 } from "../../components/ui/BasicUI";
+import { LocationPicker } from "../../components/location/LocationPicker";
 
 export function WaiterProfileScreen({ form, setForm, error, onBack, onSave }) {
   const toggle = (key, item) =>
@@ -57,11 +58,15 @@ export function WaiterProfileScreen({ form, setForm, error, onBack, onSave }) {
           placeholder="Nume complet *"
         />
 
-        <Field
-          icon="location-outline"
-          value={form.city}
-          onChangeText={(v) => setForm((p) => ({ ...p, city: v }))}
-          placeholder="Oraș *"
+        <LocationPicker
+          city={form.city}
+          address={form.address}
+          onChangeCity={(v) =>
+            setForm((p) => ({ ...p, city: v }))
+          }
+          onChangeAddress={(v) =>
+            setForm((p) => ({ ...p, address: v }))
+          }
         />
 
         <Field

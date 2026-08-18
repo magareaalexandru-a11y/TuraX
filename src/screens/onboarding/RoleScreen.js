@@ -1,5 +1,6 @@
 import React from "react";
 import {
+  Image,
   View,
   Text,
   TouchableOpacity,
@@ -13,7 +14,6 @@ import {
   BackButton,
   ErrorBox,
 } from "../../components/ui/BasicUI";
-import { ClocheLogo } from "../../components/navigation/AppNavigation";
 
 export function RoleScreen({ onBack, onChoose, error }) {
   return (
@@ -22,7 +22,11 @@ export function RoleScreen({ onBack, onChoose, error }) {
         <BackButton onPress={onBack} />
 
         <View style={{ alignItems: "center" }}>
-          <ClocheLogo size={220} />
+          <Image
+            source={require("../../../assets/turax-logo.png")}
+            style={{ width: 260, height: 208 }}
+            resizeMode="contain"
+          />
           <Text style={{ color: C.text, fontSize: 36, fontWeight: "900", textAlign: "center", marginTop: 10 }}>
             Bun venit! 👋
           </Text>

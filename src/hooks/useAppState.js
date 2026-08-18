@@ -21,6 +21,7 @@ export function useAppState() {
   const [waiterForm, setWaiterForm] = useState({
     fullName: "",
     city: "",
+    address: "",
     experience: "",
     description: "",
     workerRoles: [],
