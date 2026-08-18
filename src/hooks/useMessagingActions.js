@@ -111,7 +111,17 @@ export function useMessagingActions({
       if (!n?.id || n.read_at) return;
       const now = new Date().toISOString();
       setNotifications((prev) => prev.map((x) => (x.id === n.id ? { ...x, read_at: now } : x)));
-      await supabase.from("notifications").update({ read_at: now }).eq("id", n.id);
+      const { error } = await supabase
+      .from("notifications")
+      .update({ read_at: now })
+      .eq("id", n.id);
+
+    if (error) {
+      setNotifications((prev) =>
+        prev.map((x) => (x.id === n.id ? { ...x, read_at: null } : x))
+      );
+      console.log("TuraX mark notification read:", error.message);
+    }
     };
 
     const openNotification = async (n) => {

@@ -58,9 +58,14 @@ export function useAuthActions({
       if (error) return setAuthMessage(error.message);
 
       if (data.session?.user?.id) {
-        await supabase
+        const { error: profileInitError } = await supabase
           .from("profiles")
           .upsert({ id: data.session.user.id, full_name: authName.trim() }, { onConflict: "id" });
+
+        if (profileInitError) {
+          setAuthMessage(`Contul a fost creat, dar profilul nu a putut fi inițializat: ${profileInitError.message}`);
+          return;
+        }
       }
       setAuthMessage(
         data.session
