@@ -308,15 +308,88 @@ export function AvailabilityScreen({ selectedDates, setSelectedDates, dayAvailab
   );
 }
 
-export function PublishShiftScreen({ form, setForm, profile, error, busy, onPublish }) {
+export function PublishShiftScreen({
+  form,
+  setForm,
+  profile,
+  error,
+  busy,
+  onPublish,
+}) {
   useEffect(() => {
     setForm((p) => ({
       ...p,
       locationName: p.locationName || profile?.location_name || "",
       city: p.city || profile?.location_city || "",
       address: p.address || profile?.location_address || "",
+      publishDates: Array.isArray(p.publishDates) ? p.publishDates : [],
+      publishDetails:
+        p.publishDetails && typeof p.publishDetails === "object"
+          ? p.publishDetails
+          : {},
     }));
   }, [profile?.id]);
+
+  const publishDates = Array.isArray(form.publishDates)
+    ? form.publishDates
+    : [];
+
+  const details =
+    form.publishDetails && typeof form.publishDetails === "object"
+      ? form.publishDetails
+      : {};
+
+  const emptyDay = () => ({
+    start: "",
+    end: "",
+    workersNeeded: "",
+    hourlyRate: "",
+    description: "",
+  });
+
+  const togglePublishDate = (date) => {
+    setForm((prev) => {
+      const currentDates = Array.isArray(prev.publishDates)
+        ? prev.publishDates
+        : [];
+
+      const exists = currentDates.includes(date);
+
+      const nextDates = exists
+        ? currentDates.filter((item) => item !== date)
+        : [...currentDates, date].sort();
+
+      const nextDetails = {
+        ...(prev.publishDetails || {}),
+      };
+
+      if (exists) {
+        delete nextDetails[date];
+      } else if (!nextDetails[date]) {
+        nextDetails[date] = emptyDay();
+      }
+
+      return {
+        ...prev,
+        publishDates: nextDates,
+        publishDetails: nextDetails,
+      };
+    });
+  };
+
+  const updateDay = (date, patch) => {
+    setForm((prev) => ({
+      ...prev,
+      publishDetails: {
+        ...(prev.publishDetails || {}),
+        [date]: {
+          ...emptyDay(),
+          ...((prev.publishDetails || {})[date] || {}),
+          ...patch,
+        },
+      },
+    }));
+  };
 
   return (
     <Shell>
@@ -325,14 +398,23 @@ export function PublishShiftScreen({ form, setForm, profile, error, busy, onPubl
           Publică o tură
         </Title>
 
-        <Text style={{ color: C.gold, fontWeight: "900", marginBottom: 7 }}>Rol căutat</Text>
+        <Text
+          style={{
+            color: C.gold,
+            fontWeight: "900",
+            marginBottom: 7,
+          }}
+        >
+          Rol căutat *
+        </Text>
+
         <PickerBox
           value={form.role}
           onChange={(v) =>
             setForm((p) => ({
               ...p,
               role: v,
-              customRole: v === "Altele" ? (p.customRole || "") : "",
+              customRole: v === "Altele" ? p.customRole || "" : "",
             }))
           }
           placeholder="Alege rolul"
@@ -346,10 +428,14 @@ export function PublishShiftScreen({ form, setForm, profile, error, busy, onPubl
               icon="briefcase-outline"
               value={form.customRole || ""}
               onChangeText={(v) =>
-                setForm((p) => ({ ...p, customRole: v }))
+                setForm((p) => ({
+                  ...p,
+                  customRole: v,
+                }))
               }
-              placeholder="Ex: Personal curățenie, Steward bucătărie / Spălător vase"
+              placeholder="Ex: Personal curățenie, Steward / Spălător vase"
             />
+
             <Text
               style={{
                 color: C.muted,
@@ -359,39 +445,229 @@ export function PublishShiftScreen({ form, setForm, profile, error, busy, onPubl
                 marginBottom: 4,
               }}
             >
-              Folosește denumirea profesională a postului. Rolul introdus aici va apărea pe tura publicată.
+              Folosește denumirea profesională a postului. Rolul introdus aici
+              va apărea pe tura publicată.
             </Text>
           </View>
         )}
 
         <View style={{ height: 14 }} />
-        <Field value={form.locationName} onChangeText={(v) => setForm((p) => ({ ...p, locationName: v }))} placeholder="Numele locației *" icon="business-outline" />
-        <Field value={form.city} onChangeText={(v) => setForm((p) => ({ ...p, city: v }))} placeholder="Oraș *" icon="location-outline" />
-        <Field value={form.address} onChangeText={(v) => setForm((p) => ({ ...p, address: v }))} placeholder="Adresă / Zonă" icon="map-outline" />
 
-        <Text style={{ color: C.text, fontSize: 18, fontWeight: "900", marginTop: 8, marginBottom: 10 }}>Data</Text>
-        <DarkCalendar
-          selectedDates={form.date ? [form.date] : []}
-          onDayPress={(day) => setForm((p) => ({ ...p, date: day.dateString }))}
-          single
+        <Field
+          value={form.locationName}
+          onChangeText={(v) =>
+            setForm((p) => ({
+              ...p,
+              locationName: v,
+            }))
+          }
+          placeholder="Numele locației *"
+          icon="business-outline"
         />
 
-        <Text style={{ color: C.text, fontSize: 18, fontWeight: "900", marginTop: 20, marginBottom: 10 }}>Interval orar</Text>
-        <View style={{ flexDirection: "row", marginBottom: 14 }}>
-          <View style={{ flex: 1, marginRight: 6 }}>
-            <TimePickerBox value={form.start} onChange={(v) => setForm((p) => ({ ...p, start: v }))} placeholder="Început" disabledTimes={TIME_SLOTS.filter((time) => !isPublishStartAllowed(form.date, time))} />
-          </View>
-          <View style={{ flex: 1, marginLeft: 6 }}>
-            <TimePickerBox value={form.end} onChange={(v) => setForm((p) => ({ ...p, end: v }))} placeholder="Final" />
-          </View>
-        </View>
+        <Field
+          value={form.city}
+          onChangeText={(v) =>
+            setForm((p) => ({
+              ...p,
+              city: v,
+            }))
+          }
+          placeholder="Oraș *"
+          icon="location-outline"
+        />
 
-        <Field value={form.workersNeeded} onChangeText={(v) => setForm((p) => ({ ...p, workersNeeded: v }))} placeholder="Număr persoane necesare *" keyboardType="numeric" icon="people-outline" />
-        <Field value={form.hourlyRate} onChangeText={(v) => setForm((p) => ({ ...p, hourlyRate: v }))} placeholder="Tarif lei/oră *" keyboardType="numeric" icon="cash-outline" />
-        <Field value={form.description} onChangeText={(v) => setForm((p) => ({ ...p, description: v }))} placeholder="Detalii suplimentare" multiline />
+        <Field
+          value={form.address}
+          onChangeText={(v) =>
+            setForm((p) => ({
+              ...p,
+              address: v,
+            }))
+          }
+          placeholder="Adresă / Zonă"
+          icon="map-outline"
+        />
+
+        <Text
+          style={{
+            color: C.text,
+            fontSize: 18,
+            fontWeight: "900",
+            marginTop: 8,
+            marginBottom: 10,
+          }}
+        >
+          Selectează zilele *
+        </Text>
+
+        <DarkCalendar
+          selectedDates={publishDates}
+          onDayPress={(day) => togglePublishDate(day.dateString)}
+        />
+
+        {publishDates.length > 0 ? (
+          <View style={{ marginTop: 22 }}>
+            <Text
+              style={{
+                color: C.text,
+                fontSize: 18,
+                fontWeight: "900",
+                marginBottom: 12,
+              }}
+            >
+              Detalii pentru fiecare zi
+            </Text>
+
+            {publishDates.map((date) => {
+              const info = {
+                ...emptyDay(),
+                ...(details[date] || {}),
+              };
+
+              return (
+                <View
+                  key={date}
+                  style={{
+                    backgroundColor: C.panel2,
+                    borderRadius: 18,
+                    borderWidth: 1,
+                    borderColor: C.border,
+                    padding: 15,
+                    marginBottom: 14,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: C.gold,
+                      fontSize: 17,
+                      fontWeight: "900",
+                      marginBottom: 14,
+                    }}
+                  >
+                    {formatDateRo(date)}
+                  </Text>
+
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      marginBottom: 12,
+                    }}
+                  >
+                    <View
+                      style={{
+                        flex: 1,
+                        marginRight: 6,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color: C.muted,
+                          fontSize: 12,
+                          marginBottom: 6,
+                        }}
+                      >
+                        De la
+                      </Text>
+
+                      <TimePickerBox
+                        value={info.start}
+                        onChange={(v) =>
+                          updateDay(date, {
+                            start: v,
+                          })
+                        }
+                        placeholder="Început"
+                        disabledItems={TIME_SLOTS.filter(
+                          (time) =>
+                            !isPublishStartAllowed(date, time)
+                        )}
+                      />
+                    </View>
+
+                    <View
+                      style={{
+                        flex: 1,
+                        marginLeft: 6,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color: C.muted,
+                          fontSize: 12,
+                          marginBottom: 6,
+                        }}
+                      >
+                        Până la
+                      </Text>
+
+                      <TimePickerBox
+                        value={info.end}
+                        onChange={(v) =>
+                          updateDay(date, {
+                            end: v,
+                          })
+                        }
+                        placeholder="Final"
+                      />
+                    </View>
+                  </View>
+
+                  <Field
+                    value={info.hourlyRate}
+                    onChangeText={(v) =>
+                      updateDay(date, {
+                        hourlyRate: v,
+                      })
+                    }
+                    placeholder="Tarif lei/oră *"
+                    keyboardType="numeric"
+                    icon="cash-outline"
+                  />
+
+                  <Field
+                    value={info.workersNeeded}
+                    onChangeText={(v) =>
+                      updateDay(date, {
+                        workersNeeded: v,
+                      })
+                    }
+                    placeholder="Număr persoane necesare *"
+                    keyboardType="numeric"
+                    icon="people-outline"
+                  />
+
+                  <Field
+                    value={info.description}
+                    onChangeText={(v) =>
+                      updateDay(date, {
+                        description: v,
+                      })
+                    }
+                    placeholder="Detalii suplimentare"
+                    multiline
+                  />
+                </View>
+              );
+            })}
+          </View>
+        ) : null}
 
         <ErrorBox text={error} />
-        <Button label={busy ? "Se publică..." : "Publică tura"} icon="paper-plane-outline" onPress={onPublish} disabled={busy} style={{ marginTop: 8 }} />
+
+        <Button
+          label={
+            busy
+              ? "Se publică..."
+              : publishDates.length > 1
+                ? `Publică ${publishDates.length} ture`
+                : "Publică tura"
+          }
+          icon="paper-plane-outline"
+          onPress={onPublish}
+          disabled={busy || publishDates.length === 0}
+          style={{ marginTop: 8 }}
+        />
       </ScreenScroll>
     </Shell>
   );

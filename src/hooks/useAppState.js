@@ -72,6 +72,8 @@ export function useAppState() {
     workersNeeded: "1",
     hourlyRate: "",
     description: "",
+    publishDates: [],
+    publishDetails: {},
   });
   const [publishError, setPublishError] = useState("");
 

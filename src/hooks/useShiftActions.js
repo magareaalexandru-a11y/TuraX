@@ -173,9 +173,9 @@ export function useShiftActions({
 
   const publishShift = async () => {
     if (publishBusy) return;
+
     setPublishError("");
-    const needed = Number(shiftForm.workersNeeded);
-    const rate = Number(shiftForm.hourlyRate);
+
     const effectiveRole =
       shiftForm.role === "Altele"
         ? String(shiftForm.customRole || "").trim()
@@ -185,41 +185,113 @@ export function useShiftActions({
       return setPublishError("Alege rolul căutat.");
     }
 
-    if (shiftForm.role === "Altele" && effectiveRole.length < 2) {
+    if (
+      shiftForm.role === "Altele" &&
+      effectiveRole.length < 2
+    ) {
       return setPublishError("Specifică rolul necesar.");
     }
 
     if (effectiveRole.length > 60) {
-      return setPublishError("Denumirea rolului poate avea maximum 60 de caractere.");
+      return setPublishError(
+        "Denumirea rolului poate avea maximum 60 de caractere."
+      );
     }
 
-    if (!shiftForm.locationName.trim()) return setPublishError("Completează numele locației.");
-    if (!shiftForm.city.trim()) return setPublishError("Completează orașul.");
-    if (!shiftForm.date) return setPublishError("Selectează data turei.");
-    if (!shiftForm.start || !shiftForm.end) return setPublishError("Selectează intervalul orar.");
-    if (!Number.isInteger(needed) || needed < 1) return setPublishError("Numărul de persoane necesare trebuie să fie cel puțin 1.");
-    if (!Number.isFinite(rate) || rate <= 0) return setPublishError("Introdu un tarif orar valid.");
+    if (!shiftForm.locationName.trim()) {
+      return setPublishError("Completează numele locației.");
+    }
 
-    if (!isPublishStartAllowed(shiftForm.date, shiftForm.start)) {
-      return setPublishError("Tura trebuie să înceapă cu cel puțin 60 de minute de acum.");
+    if (!shiftForm.city.trim()) {
+      return setPublishError("Completează orașul.");
+    }
+
+    const dates =
+      Array.isArray(shiftForm.publishDates) &&
+      shiftForm.publishDates.length > 0
+        ? [...shiftForm.publishDates].sort()
+        : shiftForm.date
+          ? [shiftForm.date]
+          : [];
+
+    if (dates.length === 0) {
+      return setPublishError("Selectează cel puțin o zi.");
+    }
+
+    const details =
+      shiftForm.publishDetails &&
+      typeof shiftForm.publishDetails === "object"
+        ? shiftForm.publishDetails
+        : {};
+
+    const rows = [];
+
+    for (const date of dates) {
+      const info = details[date] || {
+        start: shiftForm.start || "",
+        end: shiftForm.end || "",
+        workersNeeded: shiftForm.workersNeeded || "",
+        hourlyRate: shiftForm.hourlyRate || "",
+        description: shiftForm.description || "",
+      };
+
+      if (!info.start || !info.end) {
+        return setPublishError(
+          `Completează intervalul orar pentru ${date}.`
+        );
+      }
+
+      const needed = Number(info.workersNeeded);
+      const rate = Number(info.hourlyRate);
+
+      if (!Number.isInteger(needed) || needed < 1) {
+        return setPublishError(
+          `Numărul de persoane pentru ${date} trebuie să fie cel puțin 1.`
+        );
+      }
+
+      if (!Number.isFinite(rate) || rate <= 0) {
+        return setPublishError(
+          `Tariful pentru ${date} trebuie să fie mai mare decât 0.`
+        );
+      }
+
+      if (!isPublishStartAllowed(date, info.start)) {
+        return setPublishError(
+          `Tura din ${date} trebuie să înceapă cu cel puțin 60 de minute de acum.`
+        );
+      }
+
+      rows.push({
+        date,
+        info,
+        needed,
+        rate,
+      });
     }
 
     setPublishBusy(true);
-    try {
-      const { error } = await supabase.rpc("publish_shift", {
-        p_role: effectiveRole,
-        p_location_name: shiftForm.locationName.trim(),
-        p_city: shiftForm.city.trim(),
-        p_address: shiftForm.address.trim() || null,
-        p_shift_date: shiftForm.date,
-        p_start_time: shiftForm.start,
-        p_end_time: shiftForm.end,
-        p_workers_needed: needed,
-        p_hourly_rate: rate,
-        p_description: shiftForm.description.trim() || null,
-      });
 
-      if (error) return setPublishError(error.message);
+    try {
+      for (const row of rows) {
+        const { error } = await supabase.rpc("publish_shift", {
+          p_role: effectiveRole,
+          p_location_name: shiftForm.locationName.trim(),
+          p_city: shiftForm.city.trim(),
+          p_address: shiftForm.address.trim() || null,
+          p_shift_date: row.date,
+          p_start_time: row.info.start,
+          p_end_time: row.info.end,
+          p_workers_needed: row.needed,
+          p_hourly_rate: row.rate,
+          p_description:
+            String(row.info.description || "").trim() || null,
+        });
+
+        if (error) {
+          throw error;
+        }
+      }
 
       setShiftForm({
         role: "Ospătar",
@@ -230,13 +302,26 @@ export function useShiftActions({
         date: "",
         start: "",
         end: "",
-        workersNeeded: "1",
+        workersNeeded: "",
         hourlyRate: "",
         description: "",
+        publishDates: [],
+        publishDetails: {},
       });
+
       await refreshCoreData(true);
-      showNotice("Tura a fost publicată.");
+
+      showNotice(
+        rows.length === 1
+          ? "Tura a fost publicată."
+          : `${rows.length} ture au fost publicate.`
+      );
+
       setScreen("home");
+    } catch (error) {
+      setPublishError(
+        error?.message || "Turele nu au putut fi publicate."
+      );
     } finally {
       setPublishBusy(false);
     }
