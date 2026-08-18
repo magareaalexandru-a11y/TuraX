@@ -292,6 +292,7 @@ export default function App() {
     openConversationFromList,
     markNotificationRead,
     openNotification,
+    clearNotifications,
   } = useMessagingActions({
     currentUserId,
     selectedShift,
@@ -415,6 +416,7 @@ export default function App() {
       applications={applications}
       myApplications={myApplications}
       notifications={notifications}
+        clearNotifications={clearNotifications}
       favorites={favorites}
       toggleFavorite={toggleFavorite}
       unreadCount={unreadCount}

@@ -24,7 +24,7 @@ export default function ProfileScreen({ role, profile, shifts, acceptedShifts, o
   const name = manager ? profile?.location_name || "Locație" : profile?.full_name || "Ospătar";
   return (
     <Shell>
-      <ScreenScroll bottom={110}>
+      <ScreenScroll bottom={180}>
         <View style={{ alignItems: "center", marginTop: 12 }}>
           <TouchableOpacity onPress={onChangePhoto} disabled={photoBusy} activeOpacity={0.82} style={{ position: "relative" }}>
             <AvatarCircle uri={profile?.avatar_url} role={role} size={108} />

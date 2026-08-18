@@ -15,12 +15,30 @@ import {
 } from "../../components/ui/BasicUI";
 import { EmptyCard } from "../../components/ui/FeedbackUI";
 
-export default function NotificationsScreen({ notifications, onBack, onOpen }) {
+export default function NotificationsScreen({ notifications, onBack, onOpen, onClear }) {
   return (
     <Shell>
       <ScreenScroll bottom={40}>
         <BackButton onPress={onBack} />
         <Title>Notificări</Title>
+
+        {notifications.length > 0 && onClear ? (
+          <TouchableOpacity
+            onPress={onClear}
+            activeOpacity={0.82}
+            style={{
+              alignSelf: "flex-end",
+              marginTop: -44,
+              marginBottom: 20,
+              paddingVertical: 10,
+              paddingHorizontal: 4,
+            }}
+          >
+            <Text style={{ color: C.gold, fontWeight: "900", fontSize: 15 }}>
+              Golește
+            </Text>
+          </TouchableOpacity>
+        ) : null}
         {notifications.length === 0 ? (
           <EmptyCard icon="notifications-outline" title="Nu ai notificări" />
         ) : (

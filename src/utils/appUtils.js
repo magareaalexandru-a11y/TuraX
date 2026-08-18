@@ -8,8 +8,26 @@ export const todayIso = () => localIsoDate(new Date());
 export const MIN_PUBLISH_LEAD_MS = 60 * 60 * 1000;
 export const isPublishStartAllowed = (date, time) => {
   if (!date || !time) return false;
-  const start = new Date(`${date}T${String(time).slice(0, 5)}:00`);
-  return Number.isFinite(start.getTime()) && start.getTime() >= Date.now() + MIN_PUBLISH_LEAD_MS;
+
+  const dateMatch = String(date).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const timeMatch = String(time).match(/^(\d{1,2}):(\d{2})/);
+
+  if (!dateMatch || !timeMatch) return false;
+
+  const start = new Date(
+    Number(dateMatch[1]),
+    Number(dateMatch[2]) - 1,
+    Number(dateMatch[3]),
+    Number(timeMatch[1]),
+    Number(timeMatch[2]),
+    0,
+    0
+  );
+
+  return (
+    Number.isFinite(start.getTime()) &&
+    start.getTime() >= Date.now() + MIN_PUBLISH_LEAD_MS
+  );
 };
 export const formatHorecaText = (value) => String(value || "")
   .replace(/(\d+)\s*pers\b/gi, "$1 persoane")

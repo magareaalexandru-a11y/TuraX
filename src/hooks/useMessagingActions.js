@@ -56,7 +56,28 @@ export function useMessagingActions({
       setChatMessages(data || []);
       setConversations((prev) => prev.map((c) => c.id === conversationId ? { ...c, unread_count: 0 } : c));
       setNotifications((prev) => prev.map((n) => {
-        const payload = n.data && typeof n.data === "object" ? n.data : {};
+        let payload = {};
+
+    if (n.data && typeof n.data === "object") {
+      payload = n.data;
+    } else if (typeof n.data === "string") {
+      try {
+        payload = JSON.parse(n.data) || {};
+      } catch (_) {
+        payload = {};
+      }
+    }
+
+    const conversationId =
+      payload.conversation_id ||
+      payload.conversationId ||
+      n.conversation_id ||
+      null;
+
+    const isMessageNotification =
+      n.type === "message_new" ||
+      n.type === "new_message" ||
+      /mesaj/i.test(String(n.title || ""));
         return n.type === "message_new" && payload.conversation_id === conversationId && !n.read_at
           ? { ...n, read_at: new Date().toISOString() }
           : n;
@@ -124,16 +145,46 @@ export function useMessagingActions({
     }
     };
 
-    const openNotification = async (n) => {
+    const clearNotifications = () => {
+    if (!currentUserId) return;
+
+    Alert.alert(
+      "Golești notificările?",
+      "Toate notificările tale vor fi șterse.",
+      [
+        { text: "Renunță", style: "cancel" },
+        {
+          text: "Golește",
+          style: "destructive",
+          onPress: async () => {
+            const { error } = await supabase
+              .from("notifications")
+              .delete()
+              .eq("user_id", currentUserId);
+
+            if (error) {
+              Alert.alert("TuraX", error.message);
+              return;
+            }
+
+            setNotifications([]);
+            showNotice("Notificările au fost golite.", "success");
+          },
+        },
+      ]
+    );
+  };
+
+  const openNotification = async (n) => {
       if (!n) return;
       await markNotificationRead(n);
       const payload = n.data && typeof n.data === "object" ? n.data : {};
 
-      if (n.type === "message_new" && payload.conversation_id) {
+      if (isMessageNotification && conversationId) {
         const { data: conversation, error } = await supabase
           .from("conversations")
           .select("*")
-          .eq("id", payload.conversation_id)
+          .eq("id", conversationId)
           .maybeSingle();
         if (error) return Alert.alert("TuraX", error.message);
         if (conversation) {
@@ -170,5 +221,6 @@ export function useMessagingActions({
     openConversationFromList,
     markNotificationRead,
     openNotification,
+    clearNotifications,
   };
 }
