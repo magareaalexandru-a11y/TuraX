@@ -22,7 +22,7 @@ import {
 } from "../screens/professionals/ProfessionalScreens";
 
 import HomeScreen from "../screens/home/HomeScreen";
-import MessagesScreen from "../screens/messages/MessagesScreen";
+import { MessagesScreen } from "../screens/messages/MessagesScreen";
 import {
   MyWaiterActivityScreen,
   ConfirmedShiftsScreen,

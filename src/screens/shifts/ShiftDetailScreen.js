@@ -13,11 +13,11 @@ import {
   ScreenScroll,
   BackButton,
   Button,
-  EmptyCard,
 } from "../../components/ui/BasicUI";
 
 import {
   RatingStars,
+  EmptyCard,
 } from "../../components/ui/FeedbackUI";
 
 import {
@@ -82,6 +82,8 @@ export default function ShiftDetailScreen({
       : applicationStatus === "rejected" || applicationStatus === "cancelled" || applicationStatus === "no_show"
       ? C.danger
       : C.gold;
+
+
 
   return (
     <Shell>

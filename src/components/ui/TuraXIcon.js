@@ -1,28 +1,67 @@
 import React from "react";
-import * as Icons from "lucide-react-native";
+import { View } from "react-native";
+import {
+  ArrowLeft,
+  Briefcase,
+  CalendarDays,
+  Camera,
+  MessageCircle,
+  Check,
+  CircleCheck,
+  ChevronDown,
+  ChevronRight,
+  X,
+  Eye,
+  EyeOff,
+  Heart,
+  MapPin,
+  Lock,
+  Bell,
+  User,
+  Send,
+  Star,
+  Clock,
+  House,
+  Search,
+  CirclePlus,
+  Mail,
+  LogIn,
+  Circle,
+} from "lucide-react-native";
 
 const ICONS = {
-  "arrow-back": Icons.ArrowLeft,
-  "business-outline": Icons.Briefcase,
-  "calendar-outline": Icons.CalendarDays,
-  "camera-outline": Icons.Camera,
-  "chatbubble-outline": Icons.MessageCircle,
-  "checkmark": Icons.Check,
-  "checkmark-circle": Icons.CircleCheck,
-  "chevron-down": Icons.ChevronDown,
-  "chevron-forward": Icons.ChevronRight,
-  "close": Icons.X,
-  "eye-outline": Icons.Eye,
-  "eye-off-outline": Icons.EyeOff,
-  "heart": Icons.Heart,
-  "heart-outline": Icons.Heart,
-  "location-outline": Icons.MapPin,
-  "lock-closed-outline": Icons.Lock,
-  "notifications-outline": Icons.Bell,
-  "person-outline": Icons.User,
-  "send": Icons.Send,
-  "star": Icons.Star,
-  "time-outline": Icons.Clock,
+  "arrow-back": ArrowLeft,
+  "business-outline": Briefcase,
+  "calendar-outline": CalendarDays,
+  "camera-outline": Camera,
+  "chatbubble-outline": MessageCircle,
+  "chatbubble-ellipses-outline": MessageCircle,
+  "checkmark": Check,
+  "checkmark-circle": CircleCheck,
+  "chevron-down": ChevronDown,
+  "chevron-forward": ChevronRight,
+  "close": X,
+  "eye-outline": Eye,
+  "eye-off-outline": EyeOff,
+  "heart": Heart,
+  "heart-outline": Heart,
+  "home-outline": House,
+  "location-outline": MapPin,
+  "lock-closed-outline": Lock,
+  "notifications-outline": Bell,
+  "person-outline": User,
+  "search-outline": Search,
+  "add-circle-outline": CirclePlus,
+  "send": Send,
+  "star": Star,
+  "time-outline": Clock,
+  "mail-outline": Mail,
+  "log-in-outline": LogIn,
+  "alert-circle-outline": Bell,
+  "information-circle-outline": Bell,
+  "checkmark-circle-outline": CircleCheck,
+  "warning-outline": Bell,
+  "help-circle-outline": Bell,
 };
 
 export function Ionicons({
@@ -32,12 +71,28 @@ export function Ionicons({
   style,
   ...props
 }) {
-  const Icon = ICONS[name] || Icons.Circle;
+  const Icon = ICONS[name];
+
+  if (!Icon) {
+    console.warn("TURAX_UNKNOWN_ICON:", name);
+    return (
+      <View
+        style={[
+          {
+            width: size,
+            height: size,
+            borderWidth: 2,
+            borderColor: color,
+            borderRadius: Math.max(2, size / 4),
+          },
+          style,
+        ]}
+      />
+    );
+  }
 
   return (
     <Icon
-      width={size}
-      height={size}
       size={size}
       color={color}
       style={style}
