@@ -60,14 +60,12 @@ export default function AuthScreen({
   return (
     <Shell>
       <ScreenScroll bottom={40}>
-        <View style={{ alignItems: "center", marginTop: 10 }}>
-          <ClocheLogo size={205} />
-          <Text style={{ color: C.text, fontSize: 44, fontWeight: "900", marginTop: 8 }}>
-            Tura<Text style={{ color: C.gold }}>X</Text>
-          </Text>
-          <Text style={{ color: C.muted, fontSize: 16, marginTop: 4 }}>
-            Ture <Text style={{ color: C.gold }}>HoReCa</Text>, când vrei tu.
-          </Text>
+        <View style={{ alignItems: "center", marginTop: 6 }}>
+          <Image
+            source={require("../../../assets/turax-logo.png")}
+            style={{ width: 288, height: 230 }}
+            resizeMode="contain"
+          />
         </View>
 
         <View style={{ marginTop: 30 }}>
