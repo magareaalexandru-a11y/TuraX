@@ -2,7 +2,7 @@ import React from "react";
 import {
   RefreshControl,
   ScrollView,
-} from "react-native";
+  } from "react-native";
 
 import { C } from "../../constants/appConstants";
 
@@ -12,8 +12,8 @@ import {
   Title,
   Field,
   Chip,
-  EmptyCard,
 } from "../../components/ui/BasicUI";
+import { EmptyCard } from "../../components/ui/FeedbackUI";
 
 import ShiftCard from "../../components/shifts/ShiftCard";
 

@@ -10,8 +10,10 @@ import { Shell,
   ScreenScroll,
   Title,
   BackButton,
-  EmptyCard } from "../../components/ui/BasicUI";
-import { RatingStars } from "../../components/ui/FeedbackUI";
+  } from "../../components/ui/BasicUI";
+import { RatingStars,
+  EmptyCard,
+} from "../../components/ui/FeedbackUI";
 import { formatDateRo,
   money,
   hasShiftEnded,

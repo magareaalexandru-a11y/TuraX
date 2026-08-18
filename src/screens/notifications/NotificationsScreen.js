@@ -3,7 +3,7 @@ import {
   Text,
   TouchableOpacity,
   View,
-} from "react-native";
+  } from "react-native";
 import { Ionicons } from "../../components/ui/TuraXIcon";
 
 import { C } from "../../constants/appConstants";
@@ -12,8 +12,8 @@ import {
   ScreenScroll,
   BackButton,
   Title,
-  EmptyCard,
 } from "../../components/ui/BasicUI";
+import { EmptyCard } from "../../components/ui/FeedbackUI";
 
 export default function NotificationsScreen({ notifications, onBack, onOpen }) {
   return (
