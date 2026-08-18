@@ -5,7 +5,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import MapView, { Marker } from "react-native-maps";
+import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import * as Location from "expo-location";
 
 import { C } from "../../constants/appConstants";
@@ -234,6 +234,7 @@ export function LocationPicker({
           }}
         >
           <MapView
+        provider={PROVIDER_GOOGLE}
             style={{ flex: 1 }}
             region={region}
             onRegionChangeComplete={setRegion}
