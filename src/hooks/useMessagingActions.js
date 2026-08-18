@@ -145,7 +145,26 @@ export function useMessagingActions({
     }
     };
 
-    const clearNotifications = () => {
+    const deleteNotification = async (notification) => {
+    if (!notification?.id || !currentUserId) return;
+
+    const { error } = await supabase
+      .from("notifications")
+      .delete()
+      .eq("id", notification.id)
+      .eq("user_id", currentUserId);
+
+    if (error) {
+      showNotice(error.message, "error");
+      return;
+    }
+
+    setNotifications((prev) =>
+      prev.filter((item) => item.id !== notification.id)
+    );
+  };
+
+  const clearNotifications = () => {
     if (!currentUserId) return;
 
     Alert.alert(
@@ -221,6 +240,7 @@ export function useMessagingActions({
     openConversationFromList,
     markNotificationRead,
     openNotification,
+    deleteNotification,
     clearNotifications,
   };
 }

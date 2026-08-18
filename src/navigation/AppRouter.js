@@ -59,6 +59,7 @@ export default function AppRouter({
   myApplications,
   notifications,
   clearNotifications,
+  deleteNotification,
   favorites,
   toggleFavorite,
   unreadCount,
@@ -352,6 +353,7 @@ export default function AppRouter({
           onBack={() => setScreen("home")}
           onOpen={openNotification}
           onClear={clearNotifications}
+          onDelete={deleteNotification}
         />
       )}
 

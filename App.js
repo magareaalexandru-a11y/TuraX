@@ -292,6 +292,7 @@ export default function App() {
     openConversationFromList,
     markNotificationRead,
     openNotification,
+    deleteNotification,
     clearNotifications,
   } = useMessagingActions({
     currentUserId,
@@ -417,6 +418,7 @@ export default function App() {
       myApplications={myApplications}
       notifications={notifications}
         clearNotifications={clearNotifications}
+        deleteNotification={deleteNotification}
       favorites={favorites}
       toggleFavorite={toggleFavorite}
       unreadCount={unreadCount}
