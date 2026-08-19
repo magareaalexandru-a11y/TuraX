@@ -127,7 +127,7 @@ export function MyWaiterActivityScreen({
             <View key={r.id} style={{ backgroundColor: C.panel2, borderRadius: 18, borderWidth: 1, borderColor: C.border, padding: 16, marginBottom: 12 }}>
               <Text style={{ color: C.text, fontSize: 17, fontWeight: "900" }}>{formatDateRo(r.available_date)}</Text>
               <Text style={{ color: C.gold, marginTop: 7, fontWeight: "800" }}>
-                {String(r.start_time || "").slice(0, 5)} – {String(r.end_time || "").slice(0, 5)} · {money(r.desired_rate)}/oră
+                {String(r.start_time || "").slice(0, 5)} – {String(r.end_time || "").slice(0, 5)} · {money(r.desired_rate)}/tură
               </Text>
               <Text style={{ color: C.success, marginTop: 6, fontWeight: "800" }}>Activă</Text>
               <TouchableOpacity onPress={() => onWithdrawAvailability(r)} style={{ alignSelf: "flex-start", marginTop: 12, borderWidth: 1, borderColor: C.danger, borderRadius: 12, paddingVertical: 9, paddingHorizontal: 13 }}>

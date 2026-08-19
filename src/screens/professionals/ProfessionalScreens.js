@@ -60,7 +60,7 @@ export function WaiterDirectoryScreen({ rows, loading, error, onBack, onMessage,
               {(r.horeca_skills || []).length > 0 && <Text style={{ color: C.text, marginTop: 10, lineHeight: 20 }}>{r.horeca_skills.slice(0, 4).join(" · ")}</Text>}
               {r.next_available_date ? (
                 <View style={{ marginTop: 12, borderRadius: 13, backgroundColor: C.panel3, padding: 11 }}>
-                  <Text style={{ color: C.success, fontWeight: "900" }}>Disponibil {formatDateRo(r.next_available_date)} · {String(r.next_start_time || "").slice(0,5)}–{String(r.next_end_time || "").slice(0,5)}{r.desired_rate ? ` · ${money(r.desired_rate)}/oră` : ""}</Text>
+                  <Text style={{ color: C.success, fontWeight: "900" }}>Disponibil {formatDateRo(r.next_available_date)} · {String(r.next_start_time || "").slice(0,5)}–{String(r.next_end_time || "").slice(0,5)}{r.desired_rate ? ` · ${money(r.desired_rate)}/tură` : ""}</Text>
                 </View>
               ) : (
                 <Text style={{ color: C.muted2, marginTop: 12 }}>Fără disponibilitate publicată momentan</Text>
@@ -314,7 +314,7 @@ export function WorkerPublicProfileScreen({
                   {" – "}
                   {String(a.end_time || "").slice(0, 5)}
                   {a.desired_rate
-                    ? ` · ${money(a.desired_rate)}/oră`
+                    ? ` · ${money(a.desired_rate)}/tură`
                     : ""}
                 </Text>
               </View>
@@ -352,7 +352,7 @@ export function AvailableWaitersScreen({ rows, onBack, onMessage }) {
                   <Text style={{ color: C.muted, marginTop: 4 }}>{r.city || "Oraș nespecificat"} · {formatDateRo(r.available_date)}</Text>
                 </View>
               </View>
-              <Text style={{ color: C.gold, marginTop: 10, fontWeight: "800" }}>{String(r.start_time || "").slice(0, 5)} – {String(r.end_time || "").slice(0, 5)} · {money(r.desired_rate)}/oră</Text>
+              <Text style={{ color: C.gold, marginTop: 10, fontWeight: "800" }}>{String(r.start_time || "").slice(0, 5)} – {String(r.end_time || "").slice(0, 5)} · {money(r.desired_rate)}/tură</Text>
               <TouchableOpacity onPress={() => onMessage(r)} style={{ flexDirection: "row", alignItems: "center", alignSelf: "flex-start", marginTop: 12 }}>
                 <Ionicons name="chatbubble-outline" size={18} color={C.gold} />
                 <Text style={{ color: C.gold, fontWeight: "800", marginLeft: 7 }}>Trimite mesaj</Text>

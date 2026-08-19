@@ -176,34 +176,40 @@ export function useShiftActions({
 
     setPublishError("");
 
+    const failPublish = (message) => {
+      setPublishError(message);
+      if (typeof showNotice === "function") showNotice(message);
+      return false;
+    };
+
     const effectiveRole =
       shiftForm.role === "Altele"
         ? String(shiftForm.customRole || "").trim()
         : String(shiftForm.role || "").trim();
 
     if (!effectiveRole) {
-      return setPublishError("Alege rolul căutat.");
+      return failPublish("Alege rolul căutat.");
     }
 
     if (
       shiftForm.role === "Altele" &&
       effectiveRole.length < 2
     ) {
-      return setPublishError("Specifică rolul necesar.");
+      return failPublish("Specifică rolul necesar.");
     }
 
     if (effectiveRole.length > 60) {
-      return setPublishError(
+      return failPublish(
         "Denumirea rolului poate avea maximum 60 de caractere."
       );
     }
 
     if (!shiftForm.locationName.trim()) {
-      return setPublishError("Completează numele locației.");
+      return failPublish("Completează numele locației.");
     }
 
     if (!shiftForm.city.trim()) {
-      return setPublishError("Completează orașul.");
+      return failPublish("Completează orașul.");
     }
 
     const dates =
@@ -215,7 +221,7 @@ export function useShiftActions({
           : [];
 
     if (dates.length === 0) {
-      return setPublishError("Selectează cel puțin o zi.");
+      return failPublish("Selectează cel puțin o zi.");
     }
 
     const details =
@@ -236,7 +242,7 @@ export function useShiftActions({
       };
 
       if (!info.start || !info.end) {
-        return setPublishError(
+        return failPublish(
           `Completează intervalul orar pentru ${date}.`
         );
       }
@@ -245,19 +251,19 @@ export function useShiftActions({
       const rate = Number(info.hourlyRate);
 
       if (!Number.isInteger(needed) || needed < 1) {
-        return setPublishError(
+        return failPublish(
           `Numărul de persoane pentru ${date} trebuie să fie cel puțin 1.`
         );
       }
 
       if (!Number.isFinite(rate) || rate <= 0) {
-        return setPublishError(
+        return failPublish(
           `Tariful pentru ${date} trebuie să fie mai mare decât 0.`
         );
       }
 
       if (!isPublishStartAllowed(date, info.start)) {
-        return setPublishError(
+        return failPublish(
           `Tura din ${date} trebuie să înceapă cu cel puțin 60 de minute de acum.`
         );
       }
@@ -319,9 +325,10 @@ export function useShiftActions({
 
       setScreen("home");
     } catch (error) {
-      setPublishError(
-        error?.message || "Turele nu au putut fi publicate."
-      );
+      const message =
+        error?.message || "Turele nu au putut fi publicate.";
+      setPublishError(message);
+      if (typeof showNotice === "function") showNotice(message);
     } finally {
       setPublishBusy(false);
     }

@@ -108,7 +108,7 @@ export default function ShiftDetailScreen({
           <ShiftInfoRow icon="calendar-outline">{formatDateRo(shift.shift_date)}</ShiftInfoRow>
           <ShiftInfoRow icon="time-outline">{String(shift.start_time || "").slice(0, 5)} – {String(shift.end_time || "").slice(0, 5)}</ShiftInfoRow>
           <ShiftInfoRow icon="people-outline">{remaining} din {needed} {needed === 1 ? "loc disponibil" : "locuri disponibile"}</ShiftInfoRow>
-          <Text style={{ color: C.success, fontSize: 18, fontWeight: "900", marginTop: 14 }}>{money(shift.hourly_rate)}/oră</Text>
+          <Text style={{ color: C.success, fontSize: 18, fontWeight: "900", marginTop: 14 }}>{money(shift.hourly_rate)}/tură</Text>
         </View>
 
         {!!shift.description && (

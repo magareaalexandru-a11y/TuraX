@@ -269,7 +269,7 @@ export function AvailabilityScreen({ selectedDates, setSelectedDates, dayAvailab
                   </Text>
 
                   <Field
-                    label="Tarif dorit (lei/oră)"
+                    label="Tarif dorit pe tură (lei)"
                     value={info.rate || ""}
                     onChangeText={(v) => setDayAvailability((p) => ({ ...p, [date]: { ...(p[date] || {}), rate: v } }))}
                     placeholder="Ex: 35"
@@ -620,7 +620,7 @@ export function PublishShiftScreen({
                         hourlyRate: v,
                       })
                     }
-                    placeholder="Tarif lei/oră *"
+                    placeholder="Tarif pe tură (lei) *"
                     keyboardType="numeric"
                     icon="cash-outline"
                   />

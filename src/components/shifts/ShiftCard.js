@@ -89,7 +89,7 @@ export default function ShiftCard({ shift, favorite, onFavorite, onPress, showSt
       </View>
 
       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 15 }}>
-        <Text style={{ color: C.success, fontWeight: "900", fontSize: 15 }}>{money(shift.hourly_rate)}/oră</Text>
+        <Text style={{ color: C.success, fontWeight: "900", fontSize: 15 }}>{money(shift.hourly_rate)}/tură</Text>
         <Text style={{ color: C.gold, fontWeight: "900" }}>Vezi detalii ›</Text>
       </View>
     </TouchableOpacity>
