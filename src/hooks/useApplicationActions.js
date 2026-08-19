@@ -1,4 +1,10 @@
 import { useCallback } from "react";
+import { Alert } from "react-native";
+import {
+  canCancelConfirmedShift,
+  formatDateRo,
+  isPublishStartAllowed,
+} from "../utils/appUtils";
 
 export function useApplicationActions({
   supabase,
@@ -16,6 +22,7 @@ export function useApplicationActions({
   myApplications,
   selectedShift,
   reloadSelectedShift,
+  setApplications,
 }) {
   const updateApplication = async (applicationId, status) => {
     const { error } = await supabase.rpc("manager_set_application_status", {

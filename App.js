@@ -254,6 +254,7 @@ export default function App() {
     shiftForm,
     setShiftForm,
     setPublishError,
+    publishBusy,
     setPublishBusy,
     isPublishStartAllowed,
     formatDateRo,
@@ -283,6 +284,7 @@ export default function App() {
     myApplications,
     selectedShift,
     reloadSelectedShift,
+    setApplications,
   });
 
   const {

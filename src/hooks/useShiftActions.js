@@ -28,6 +28,7 @@ export function useShiftActions({
   shiftForm,
   setShiftForm,
   setPublishError,
+  publishBusy,
   setPublishBusy,
   isPublishStartAllowed,
   formatDateRo,
@@ -172,11 +173,16 @@ export function useShiftActions({
   };
 
   const publishShift = async () => {
-    if (publishBusy) return;
+    if (publishBusy) {
+      
+      return;
+    }
 
+    
     setPublishError("");
 
     const failPublish = (message) => {
+      
       setPublishError(message);
       if (typeof showNotice === "function") showNotice(message);
       return false;

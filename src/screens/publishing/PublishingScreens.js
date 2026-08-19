@@ -578,7 +578,7 @@ export function PublishShiftScreen({
                           })
                         }
                         placeholder="Început"
-                        disabledItems={TIME_SLOTS.filter(
+                        disabledTimes={TIME_SLOTS.filter(
                           (time) =>
                             !isPublishStartAllowed(date, time)
                         )}
@@ -665,7 +665,7 @@ export function PublishShiftScreen({
           }
           icon="paper-plane-outline"
           onPress={onPublish}
-          disabled={busy || publishDates.length === 0}
+          disabled={busy}
           style={{ marginTop: 8 }}
         />
       </ScreenScroll>
