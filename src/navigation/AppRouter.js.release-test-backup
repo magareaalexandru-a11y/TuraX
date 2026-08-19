@@ -22,7 +22,7 @@ import {
 } from "../screens/professionals/ProfessionalScreens";
 
 import HomeScreen from "../screens/home/HomeScreen";
-import { MessagesScreen } from "../screens/messages/MessagesScreen";
+import MessagesScreen from "../screens/messages/MessagesScreen";
 import {
   MyWaiterActivityScreen,
   ConfirmedShiftsScreen,
@@ -38,6 +38,7 @@ export default function AppRouter({
   setScreen,
   role,
   profile,
+  conversation,
   chatConversation,
   chatMessages,
   chatText,
@@ -58,8 +59,6 @@ export default function AppRouter({
   applications,
   myApplications,
   notifications,
-  clearNotifications,
-  deleteNotification,
   favorites,
   toggleFavorite,
   unreadCount,
@@ -119,7 +118,6 @@ export default function AppRouter({
   setWorkerProfileError,
   shiftForm,
   submitShiftRating,
-  hideHistoryItem,
 }) {
   const appScreen = (
 <View style={{ flex: 1, backgroundColor: C.bg }}>
@@ -190,7 +188,6 @@ export default function AppRouter({
           favorites={favorites}
           onFavorite={toggleFavorite}
           onOpenShift={openShift}
-          onDeleteHistory={hideHistoryItem}
           refreshing={refreshing}
           onRefresh={refresh}
         />
@@ -253,7 +250,6 @@ export default function AppRouter({
           onBack={() => setScreen("home")}
           onWithdrawAvailability={withdrawAvailability}
           onCancelApplication={cancelMyApplication}
-          onDeleteHistory={hideHistoryItem}
           onRateManager={(application, rating) =>
             submitShiftRating({
               shiftId: application.shift_id,
@@ -321,12 +317,6 @@ export default function AppRouter({
               waiter: { waiter_id: r.waiter_id, waiter_name: r.waiter_name, waiter_avatar_url: r.waiter_avatar_url },
             })
           }
-          onInvite={(r, initialText) =>
-            openConversation({
-              waiter: { waiter_id: r.waiter_id, waiter_name: r.waiter_name, waiter_avatar_url: r.waiter_avatar_url },
-              initialText,
-            })
-          }
         />
       )}
 
@@ -361,8 +351,6 @@ export default function AppRouter({
           notifications={notifications}
           onBack={() => setScreen("home")}
           onOpen={openNotification}
-          onClear={clearNotifications}
-          onDelete={deleteNotification}
         />
       )}
 

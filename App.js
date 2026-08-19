@@ -59,6 +59,7 @@ import { useMessagingActions } from "./src/hooks/useMessagingActions";
 import { filterShifts } from "./src/utils/shiftFilterUtils";
 import { useShiftActions } from "./src/hooks/useShiftActions";
 import { useApplicationActions } from "./src/hooks/useApplicationActions";
+import { useHistoryActions } from "./src/hooks/useHistoryActions";
 import { useProfileActions } from "./src/hooks/useProfileActions";
 import { useProfileDerivedState } from "./src/hooks/useProfileDerivedState";
 import { useProfileFlowActions } from "./src/hooks/useProfileFlowActions";
@@ -216,6 +217,13 @@ export default function App() {
     setMyAvailabilities,
     setMyApplications,
     setRefreshing,
+  });
+
+  const { hideHistoryItem } = useHistoryActions({
+    currentUserId,
+    askConfirm,
+    refreshCoreData,
+    showNotice,
   });
 
   const {
@@ -480,6 +488,7 @@ export default function App() {
       setWorkerProfileError={setWorkerProfileError}
       shiftForm={shiftForm}
       submitShiftRating={submitShiftRating}
+      hideHistoryItem={hideHistoryItem}
     />
   );
 

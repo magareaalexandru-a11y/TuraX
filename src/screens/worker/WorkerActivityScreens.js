@@ -1,26 +1,17 @@
 import React from "react";
-import {
-  Text,
-  TouchableOpacity,
-  View
-} from "react-native";
+import { Text, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "../../components/ui/TuraXIcon";
 import { C } from "../../constants/appConstants";
-import { Shell,
-  ScreenScroll,
-  Title,
-  BackButton,
-  } from "../../components/ui/BasicUI";
-import { RatingStars,
-  EmptyCard,
-} from "../../components/ui/FeedbackUI";
-import { formatDateRo,
+import { Shell, ScreenScroll, Title, BackButton, Button } from "../../components/ui/BasicUI";
+import { RatingStars, EmptyCard } from "../../components/ui/FeedbackUI";
+import {
+  formatDateRo,
   money,
   hasShiftEnded,
+  hasAvailabilityEnded,
   canCancelConfirmedShift,
   applicationStatusLabel,
 } from "../../utils/appUtils";
-
 import ShiftCard from "../../components/shifts/ShiftCard";
 
 export function MyWaiterActivityScreen({
@@ -29,17 +20,30 @@ export function MyWaiterActivityScreen({
   onBack,
   onWithdrawAvailability,
   onCancelApplication,
+  onDeleteHistory,
   onRateManager,
   onOpenShift,
 }) {
-  const active = applications.filter((a) => ["pending", "accepted"].includes(a.status));
-  const history = applications.filter((a) => !["pending", "accepted"].includes(a.status));
+  const activeAvailabilities = [...availabilities]
+    .filter((r) => !hasAvailabilityEnded(r))
+    .sort((a, b) => String(a.available_date).localeCompare(String(b.available_date)));
 
-  const renderApplication = (a) => {
+  const availabilityHistory = [...availabilities]
+    .filter((r) => hasAvailabilityEnded(r))
+    .sort((a, b) => String(b.available_date).localeCompare(String(a.available_date)));
+
+  const active = applications.filter(
+    (a) => ["pending", "accepted"].includes(a.status) && a.shifts && !hasShiftEnded(a.shifts)
+  );
+  const history = applications.filter(
+    (a) => !["pending", "accepted"].includes(a.status) || !a.shifts || hasShiftEnded(a.shifts)
+  );
+
+  const renderApplication = (a, historyItem = false) => {
     const shift = a.shifts || {};
     const confirmed = a.status === "accepted";
     const cancellationAllowed = !confirmed || canCancelConfirmedShift(shift);
-    const canCancel = a.status === "pending" || confirmed;
+    const canCancel = !historyItem && (a.status === "pending" || confirmed);
     const statusColor =
       a.status === "accepted" || a.status === "completed"
         ? C.success
@@ -57,7 +61,7 @@ export function MyWaiterActivityScreen({
           <Text style={{ color: statusColor, marginTop: 8, fontWeight: "900" }}>{applicationStatusLabel(a.status)}</Text>
         </TouchableOpacity>
 
-        {confirmed && !cancellationAllowed && (
+        {confirmed && !historyItem && !cancellationAllowed && (
           <View style={{ flexDirection: "row", alignItems: "flex-start", marginTop: 10 }}>
             <Ionicons name="lock-closed-outline" size={18} color={C.warning} style={{ marginRight: 7, marginTop: 1 }} />
             <Text style={{ color: C.warning, lineHeight: 19, flex: 1 }}>
@@ -88,17 +92,23 @@ export function MyWaiterActivityScreen({
         )}
 
         {a.status === "completed" && shift.manager_id && (
-          <RatingStars
-            label="Evaluează locația după această tură"
-            compact
-            onRate={(rating) => onRateManager(a, rating)}
-          />
+          <RatingStars label="Evaluează locația după această tură" compact onRate={(rating) => onRateManager(a, rating)} />
         )}
 
         {a.status === "no_show" && (
           <Text style={{ color: C.danger, marginTop: 10, lineHeight: 19 }}>
             Managerul a înregistrat o neprezentare pentru această tură.
           </Text>
+        )}
+
+        {historyItem && (
+          <Button
+            label="Șterge din istoric"
+            icon="trash-outline"
+            danger
+            onPress={() => onDeleteHistory("application", a.id, "Această tură")}
+            style={{ marginTop: 14 }}
+          />
         )}
       </View>
     );
@@ -118,12 +128,12 @@ export function MyWaiterActivityScreen({
         </View>
 
         <Text style={{ color: C.text, fontSize: 20, fontWeight: "900", marginBottom: 12 }}>
-          Disponibilitățile mele ({availabilities.length})
+          Disponibilitățile mele ({activeAvailabilities.length})
         </Text>
-        {availabilities.length === 0 ? (
+        {activeAvailabilities.length === 0 ? (
           <EmptyCard icon="calendar-outline" title="Nu ai disponibilități active" text="Publică una din butonul Publică." />
         ) : (
-          availabilities.map((r) => (
+          activeAvailabilities.map((r) => (
             <View key={r.id} style={{ backgroundColor: C.panel2, borderRadius: 18, borderWidth: 1, borderColor: C.border, padding: 16, marginBottom: 12 }}>
               <Text style={{ color: C.text, fontSize: 17, fontWeight: "900" }}>{formatDateRo(r.available_date)}</Text>
               <Text style={{ color: C.gold, marginTop: 7, fontWeight: "800" }}>
@@ -138,27 +148,50 @@ export function MyWaiterActivityScreen({
         )}
 
         <Text style={{ color: C.text, fontSize: 20, fontWeight: "900", marginTop: 26, marginBottom: 12 }}>
+          Istoric disponibilități ({availabilityHistory.length})
+        </Text>
+        {availabilityHistory.length === 0 ? (
+          <EmptyCard icon="time-outline" title="Nicio disponibilitate veche" text="Disponibilitățile expirate vor apărea aici." />
+        ) : (
+          availabilityHistory.map((r) => (
+            <View key={r.id} style={{ backgroundColor: C.panel2, borderRadius: 18, borderWidth: 1, borderColor: C.border, padding: 16, marginBottom: 12 }}>
+              <Text style={{ color: C.text, fontSize: 17, fontWeight: "900" }}>{formatDateRo(r.available_date)}</Text>
+              <Text style={{ color: C.gold, marginTop: 7, fontWeight: "800" }}>
+                {String(r.start_time || "").slice(0, 5)} – {String(r.end_time || "").slice(0, 5)} · {money(r.desired_rate)}/tură
+              </Text>
+              <Text style={{ color: C.muted, marginTop: 6, fontWeight: "800" }}>Expirată</Text>
+              <Button
+                label="Șterge din istoric"
+                icon="trash-outline"
+                danger
+                onPress={() => onDeleteHistory("availability", r.id, "Această disponibilitate")}
+                style={{ marginTop: 14 }}
+              />
+            </View>
+          ))
+        )}
+
+        <Text style={{ color: C.text, fontSize: 20, fontWeight: "900", marginTop: 26, marginBottom: 12 }}>
           Angajamente active ({active.length})
         </Text>
         {active.length === 0 ? (
           <EmptyCard icon="briefcase-outline" title="Nicio candidatură activă" text="Candidaturile noi și turele confirmate apar aici." />
         ) : (
-          active.map(renderApplication)
+          active.map((a) => renderApplication(a, false))
         )}
 
         <Text style={{ color: C.text, fontSize: 20, fontWeight: "900", marginTop: 26, marginBottom: 12 }}>
-          Istoric ({history.length})
+          Istoric ture ({history.length})
         </Text>
         {history.length === 0 ? (
-          <EmptyCard icon="time-outline" title="Istoricul este gol" text="Turele finalizate, anulate, respinse sau no-show vor rămâne aici." />
+          <EmptyCard icon="time-outline" title="Istoricul este gol" text="Turele finalizate, anulate, respinse sau expirate vor apărea aici." />
         ) : (
-          history.map(renderApplication)
+          history.map((a) => renderApplication(a, true))
         )}
       </ScreenScroll>
     </Shell>
   );
 }
-
 
 export function ConfirmedShiftsScreen({ applications, onBack, onOpenShift }) {
   const confirmed = applications.filter((a) => a.status === "accepted" && a.shifts && !hasShiftEnded(a.shifts));
@@ -170,9 +203,7 @@ export function ConfirmedShiftsScreen({ applications, onBack, onOpenShift }) {
         {confirmed.length === 0 ? (
           <EmptyCard icon="checkmark-circle-outline" title="Nu ai ture confirmate" text="Când o candidatură este acceptată, tura va apărea aici." />
         ) : (
-          confirmed.map((a) => (
-            <ShiftCard key={a.id} shift={a.shifts} onPress={() => onOpenShift(a)} />
-          ))
+          confirmed.map((a) => <ShiftCard key={a.id} shift={a.shifts} onPress={() => onOpenShift(a)} />)
         )}
       </ScreenScroll>
     </Shell>

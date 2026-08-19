@@ -64,6 +64,20 @@ export const hasShiftEnded = (shift) => {
   const end = shiftEndDate(shift);
   return !!end && end.getTime() <= Date.now();
 };
+export const availabilityEndDate = (row) => {
+  if (!row?.available_date) return null;
+  const startTime = String(row.start_time || "00:00").slice(0, 5);
+  const endTime = String(row.end_time || row.start_time || "23:59").slice(0, 5);
+  const start = new Date(`${row.available_date}T${startTime}:00`);
+  const end = new Date(`${row.available_date}T${endTime}:00`);
+  if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime())) return null;
+  if (end <= start) end.setDate(end.getDate() + 1);
+  return end;
+};
+export const hasAvailabilityEnded = (row) => {
+  const end = availabilityEndDate(row);
+  return !!end && end.getTime() <= Date.now();
+};
 export const isEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 export const cleanPhone = (value) => value.replace(/[^\d+]/g, "");
 export const sameDay = (a, b) => {

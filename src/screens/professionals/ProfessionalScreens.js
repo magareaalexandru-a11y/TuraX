@@ -334,7 +334,7 @@ export function WorkerPublicProfileScreen({
   );
 }
 
-export function AvailableWaitersScreen({ rows, onBack, onMessage }) {
+export function AvailableWaitersScreen({ rows, onBack, onMessage, onInvite }) {
   return (
     <Shell>
       <ScreenScroll bottom={40}>
@@ -353,7 +353,18 @@ export function AvailableWaitersScreen({ rows, onBack, onMessage }) {
                 </View>
               </View>
               <Text style={{ color: C.gold, marginTop: 10, fontWeight: "800" }}>{String(r.start_time || "").slice(0, 5)} – {String(r.end_time || "").slice(0, 5)} · {money(r.desired_rate)}/tură</Text>
-              <TouchableOpacity onPress={() => onMessage(r)} style={{ flexDirection: "row", alignItems: "center", alignSelf: "flex-start", marginTop: 12 }}>
+              <Button
+                label="Invită la colaborare"
+                icon="briefcase-outline"
+                onPress={() =>
+                  onInvite?.(
+                    r,
+                    `Bună! Sunt interesat de disponibilitatea ta din ${formatDateRo(r.available_date)}, ${String(r.start_time || "").slice(0, 5)}–${String(r.end_time || "").slice(0, 5)}, la ${money(r.desired_rate)}/tură. Vrei să colaborăm?`
+                  )
+                }
+                style={{ marginTop: 14 }}
+              />
+              <TouchableOpacity onPress={() => onMessage(r)} style={{ flexDirection: "row", alignItems: "center", alignSelf: "flex-start", marginTop: 14 }}>
                 <Ionicons name="chatbubble-outline" size={18} color={C.gold} />
                 <Text style={{ color: C.gold, fontWeight: "800", marginLeft: 7 }}>Trimite mesaj</Text>
               </TouchableOpacity>

@@ -16,7 +16,7 @@ export function useMessagingActions({
   role,
   openShift,
 }) {
-    const openConversation = async ({ shift = null, waiter = null } = {}) => {
+    const openConversation = async ({ shift = null, waiter = null, initialText = "" } = {}) => {
       if (!currentUserId) return;
 
       const contextShift = shift || selectedShift || null;
@@ -38,6 +38,7 @@ export function useMessagingActions({
 
       setChatConversation(data);
       await loadChat(data.id);
+      if (initialText) setChatText(String(initialText));
       setScreen("chat");
     };
 
@@ -195,43 +196,81 @@ export function useMessagingActions({
   };
 
   const openNotification = async (n) => {
-      if (!n) return;
-      await markNotificationRead(n);
-      const payload = n.data && typeof n.data === "object" ? n.data : {};
+    if (!n) return;
 
-      if (isMessageNotification && conversationId) {
-        const { data: conversation, error } = await supabase
-          .from("conversations")
-          .select("*")
-          .eq("id", conversationId)
-          .maybeSingle();
-        if (error) return Alert.alert("TuraX", error.message);
-        if (conversation) {
-          await openConversationFromList(conversation);
-          return;
-        }
+    await markNotificationRead(n);
+
+    let payload = {};
+    if (n.data && typeof n.data === "object") {
+      payload = n.data;
+    } else if (typeof n.data === "string") {
+      try {
+        payload = JSON.parse(n.data) || {};
+      } catch (_) {
+        payload = {};
       }
+    }
 
-      if (payload.shift_id) {
-        const { data: shift, error } = await supabase
-          .from("shifts")
-          .select("*")
-          .eq("id", payload.shift_id)
-          .maybeSingle();
-        if (error) return Alert.alert("TuraX", error.message);
-        if (shift) {
-          await openShift(shift);
-          return;
-        }
-      }
+    const conversationId =
+      payload.conversation_id ||
+      payload.conversationId ||
+      n.conversation_id ||
+      null;
 
-      if (role === "waiter" && ["application_status", "application_cancelled"].includes(n.type)) {
-        setScreen("myActivity");
+    const isMessageNotification =
+      n.type === "message_new" ||
+      n.type === "new_message" ||
+      /mesaj/i.test(String(n.title || ""));
+
+    if (isMessageNotification && conversationId) {
+      const { data: conversation, error } = await supabase
+        .from("conversations")
+        .select("*")
+        .eq("id", conversationId)
+        .maybeSingle();
+
+      if (error) {
+        Alert.alert("TuraX", error.message);
         return;
       }
 
-      showNotice("Notificarea a fost marcată ca citită.", "info");
-    };
+      if (conversation) {
+        await openConversationFromList(conversation);
+        return;
+      }
+
+      Alert.alert("TuraX", "Conversația nu mai este disponibilă.");
+      return;
+    }
+
+    if (payload.shift_id) {
+      const { data: shift, error } = await supabase
+        .from("shifts")
+        .select("*")
+        .eq("id", payload.shift_id)
+        .maybeSingle();
+
+      if (error) {
+        Alert.alert("TuraX", error.message);
+        return;
+      }
+
+      if (shift) {
+        await openShift(shift);
+        return;
+      }
+    }
+
+    if (
+      role === "waiter" &&
+      ["application_status", "application_cancelled"].includes(n.type)
+    ) {
+      setScreen("myActivity");
+      return;
+    }
+
+    showNotice("Notificarea a fost marcată ca citită.", "info");
+  };
 
   return {
     openConversation,
