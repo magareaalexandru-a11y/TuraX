@@ -38,7 +38,7 @@ export function WaiterProfileScreen({ form, setForm, error, onBack, onSave }) {
 
   return (
     <Shell>
-      <ScreenScroll bottom={42}>
+      <ScreenScroll bottom={140}>
         <BackButton onPress={onBack} />
 
         <Title subtitle="Completează profilul profesional pentru a găsi ture potrivite rolurilor și experienței tale.">
@@ -175,7 +175,7 @@ export function WaiterProfileScreen({ form, setForm, error, onBack, onSave }) {
 export function ManagerProfileScreen({ form, setForm, error, onBack, onSave }) {
   return (
     <Shell>
-      <ScreenScroll bottom={42}>
+      <ScreenScroll bottom={140}>
         <BackButton onPress={onBack} />
         <Title subtitle="Datele locației apar în turele publicate și ajută profesioniștii HoReCa să știe unde aplică.">Profil locație</Title>
         <ErrorBox text={error} />
