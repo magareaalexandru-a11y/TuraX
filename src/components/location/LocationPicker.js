@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Text,
@@ -10,6 +10,7 @@ import * as Location from "expo-location";
 
 import { C } from "../../constants/appConstants";
 import { Field } from "../ui/BasicUI";
+import { supabase } from "../../lib/supabase";
 
 const DARK_MAP_STYLE = [
   { elementType: "geometry", stylers: [{ color: "#0B1626" }] },
@@ -100,6 +101,304 @@ export function LocationPicker({
   const [region, setRegion] = useState(null);
   const [loading, setLoading] = useState(false);
   const [locationError, setLocationError] = useState("");
+
+  const [citySuggestions, setCitySuggestions] = useState([]);
+  const [addressSuggestions, setAddressSuggestions] = useState([]);
+  const [citySearching, setCitySearching] = useState(false);
+  const [addressSearching, setAddressSearching] = useState(false);
+
+  const skipCityLookup = useRef(false);
+  const skipAddressLookup = useRef(false);
+  const mapRef = useRef(null);
+  const sessionToken = useRef(
+    `turax-${Date.now()}-${Math.random().toString(36).slice(2)}`
+  );
+
+  const renewSessionToken = () => {
+    sessionToken.current =
+      `turax-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  };
+
+  const callPlaces = async (body) => {
+    const { data, error } = await supabase.functions.invoke(
+      "places-autocomplete",
+      {
+        body: {
+          ...body,
+          sessionToken: sessionToken.current,
+        },
+      }
+    );
+
+    if (error) throw error;
+    if (data?.error) throw new Error(data.error);
+
+    return data;
+  };
+
+  useEffect(() => {
+    const query = String(city || "").trim();
+
+    if (skipCityLookup.current) {
+      skipCityLookup.current = false;
+      setCitySuggestions([]);
+      return;
+    }
+
+    if (query.length < 2) {
+      setCitySuggestions([]);
+      setCitySearching(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    const timer = setTimeout(async () => {
+      setCitySearching(true);
+
+      try {
+        const data = await callPlaces({
+          action: "autocomplete",
+          input: query,
+          cityOnly: true,
+        });
+
+        if (!cancelled) {
+          setCitySuggestions(data?.suggestions || []);
+        }
+      } catch (error) {
+        console.log("TuraX city autocomplete:", error?.message || error);
+        if (!cancelled) setCitySuggestions([]);
+      } finally {
+        if (!cancelled) setCitySearching(false);
+      }
+    }, 300);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [city]);
+
+  useEffect(() => {
+    const query = String(address || "").trim();
+
+    if (skipAddressLookup.current) {
+      skipAddressLookup.current = false;
+      setAddressSuggestions([]);
+      return;
+    }
+
+    if (query.length < 2) {
+      setAddressSuggestions([]);
+      setAddressSearching(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    const timer = setTimeout(async () => {
+      setAddressSearching(true);
+
+      try {
+        const searchText = city
+          ? `${query}, ${city}`
+          : query;
+
+        const data = await callPlaces({
+          action: "autocomplete",
+          input: searchText,
+          cityOnly: false,
+        });
+
+        if (!cancelled) {
+          setAddressSuggestions(data?.suggestions || []);
+        }
+      } catch (error) {
+        console.log("TuraX address autocomplete:", error?.message || error);
+        if (!cancelled) setAddressSuggestions([]);
+      } finally {
+        if (!cancelled) setAddressSearching(false);
+      }
+    }, 300);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [address, city]);
+
+  const applyPlaceToMap = (place) => {
+    if (
+      typeof place?.latitude !== "number" ||
+      typeof place?.longitude !== "number"
+    ) {
+      return;
+    }
+
+    const nextRegion = {
+      latitude: place.latitude,
+      longitude: place.longitude,
+      latitudeDelta: 0.0035,
+      longitudeDelta: 0.0035,
+    };
+
+    setRegion(nextRegion);
+
+    setTimeout(() => {
+      mapRef.current?.animateToRegion(nextRegion, 500);
+    }, 50);
+  };
+
+  const selectCitySuggestion = async (suggestion) => {
+    setCitySuggestions([]);
+    setLocationError("");
+    setCitySearching(true);
+
+    try {
+      const data = await callPlaces({
+        action: "details",
+        placeId: suggestion.placeId,
+      });
+
+      const place = data?.place;
+      const selectedCity =
+        place?.city ||
+        place?.name ||
+        suggestion.mainText ||
+        suggestion.text;
+
+      if (selectedCity) {
+        skipCityLookup.current = true;
+        onChangeCity(selectedCity);
+      }
+
+      applyPlaceToMap(place);
+      renewSessionToken();
+    } catch (error) {
+      console.log("TuraX city selection:", error?.message || error);
+      setLocationError("Nu am putut încărca orașul selectat.");
+    } finally {
+      setCitySearching(false);
+    }
+  };
+
+  const selectAddressSuggestion = async (suggestion) => {
+    setAddressSuggestions([]);
+    setLocationError("");
+    setAddressSearching(true);
+
+    try {
+      const data = await callPlaces({
+        action: "details",
+        placeId: suggestion.placeId,
+      });
+
+      const place = data?.place;
+
+      if (place?.city) {
+        skipCityLookup.current = true;
+        onChangeCity(place.city);
+      }
+
+      const selectedAddress =
+        place?.street ||
+        place?.name ||
+        suggestion.mainText ||
+        place?.formattedAddress ||
+        suggestion.text;
+
+      if (selectedAddress) {
+        skipAddressLookup.current = true;
+        onChangeAddress(selectedAddress);
+      }
+
+      applyPlaceToMap(place);
+      renewSessionToken();
+    } catch (error) {
+      console.log("TuraX address selection:", error?.message || error);
+      setLocationError("Nu am putut încărca adresa selectată.");
+    } finally {
+      setAddressSearching(false);
+    }
+  };
+
+  const renderSuggestions = (items, searching, onSelect) => {
+    if (!searching && !items.length) return null;
+
+    return (
+      <View
+        style={{
+          marginTop: -8,
+          marginBottom: 14,
+          borderWidth: 1,
+          borderColor: C.border,
+          borderRadius: 16,
+          overflow: "hidden",
+          backgroundColor: C.panel,
+        }}
+      >
+        {searching && !items.length ? (
+          <View
+            style={{
+              minHeight: 48,
+              flexDirection: "row",
+              alignItems: "center",
+              paddingHorizontal: 14,
+            }}
+          >
+            <ActivityIndicator size="small" color={C.gold} />
+            <Text
+              style={{
+                color: C.muted,
+                marginLeft: 10,
+                fontSize: 13,
+              }}
+            >
+              Se caută...
+            </Text>
+          </View>
+        ) : (
+          items.map((item, index) => (
+            <TouchableOpacity
+              key={item.placeId}
+              activeOpacity={0.75}
+              onPress={() => onSelect(item)}
+              style={{
+                paddingHorizontal: 14,
+                paddingVertical: 12,
+                borderBottomWidth:
+                  index === items.length - 1 ? 0 : 1,
+                borderBottomColor: C.border,
+              }}
+            >
+              <Text
+                style={{
+                  color: C.text,
+                  fontSize: 15,
+                  fontWeight: "700",
+                }}
+              >
+                {item.mainText || item.text}
+              </Text>
+
+              {!!item.secondaryText && (
+                <Text
+                  style={{
+                    color: C.muted,
+                    fontSize: 12,
+                    marginTop: 3,
+                  }}
+                >
+                  {item.secondaryText}
+                </Text>
+              )}
+            </TouchableOpacity>
+          ))
+        )}
+      </View>
+    );
+  };
 
   const resolveCoordinates = async (latitude, longitude) => {
     setRegion({
@@ -234,7 +533,8 @@ export function LocationPicker({
           }}
         >
           <MapView
-        provider={PROVIDER_GOOGLE}
+        ref={mapRef}
+            provider={PROVIDER_GOOGLE}
             style={{ flex: 1 }}
             region={region}
             onRegionChangeComplete={setRegion}
@@ -305,16 +605,34 @@ export function LocationPicker({
       <Field
         icon="location-outline"
         value={city || ""}
-        onChangeText={onChangeCity}
+        onChangeText={(value) => {
+          setLocationError("");
+          onChangeCity(value);
+        }}
         placeholder="Oraș *"
       />
+
+      {renderSuggestions(
+        citySuggestions,
+        citySearching,
+        selectCitySuggestion
+      )}
 
       <Field
         icon="map-outline"
         value={address || ""}
-        onChangeText={onChangeAddress}
+        onChangeText={(value) => {
+          setLocationError("");
+          onChangeAddress(value);
+        }}
         placeholder="Stradă / Zonă"
       />
+
+      {renderSuggestions(
+        addressSuggestions,
+        addressSearching,
+        selectAddressSuggestion
+      )}
     </View>
   );
 }
