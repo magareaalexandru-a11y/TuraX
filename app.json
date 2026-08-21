@@ -23,7 +23,10 @@
       "edgeToEdgeEnabled": true,
       "package": "com.alexmagarea.snackaf0a9de196754459b1c8d7f0f860bed8",
       "softwareKeyboardLayoutMode": "resize",
-      "versionCode": 1
+      "versionCode": 1,
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -40,7 +43,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "TuraX folosește fotografia aleasă doar pentru profilul tău sau logo-ul locației."
+          "photosPermission": "TuraX folosește fotografia aleasă doar pentru profilul tău sau logo-ul locației.",
+          "microphonePermission": false
         }
       ],
       "@react-native-vector-icons/ionicons",
