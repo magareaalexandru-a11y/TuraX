@@ -1,7 +1,8 @@
 import { C } from "../constants/appConstants";
+import { getMissingProfileFields } from "../utils/profileCompleteness";
 import { ChatScreen } from "../screens/messages/MessagesScreen";
 import React from "react";
-import { View } from "react-native";
+import { Alert, View } from "react-native";
 import { BottomNav } from "../components/navigation/AppNavigation";
 import { TuraXNotice, TuraXConfirm } from "../components/ui/FeedbackUI";
 
@@ -121,6 +122,30 @@ export default function AppRouter({
   submitShiftRating,
   hideHistoryItem,
 }) {
+  const openPublish = () => {
+    const missing = getMissingProfileFields(profile, role);
+
+    if (missing.length === 0) {
+      setScreen("publish");
+      return;
+    }
+
+    const profileScreen =
+      role === "waiter" ? "waiterProfile" : "managerProfile";
+
+    Alert.alert(
+      "Profil incomplet",
+      `Pentru a publica trebuie să completezi profilul. Lipsesc: ${missing.join(", ")}.`,
+      [
+        { text: "Mai târziu", style: "cancel" },
+        {
+          text: "Completează profilul",
+          onPress: () => setScreen(profileScreen),
+        },
+      ]
+    );
+  };
+
   const appScreen = (
 <View style={{ flex: 1, backgroundColor: C.bg }}>
       {screen === "home" && (
@@ -150,7 +175,7 @@ export default function AppRouter({
           onRefresh={refresh}
           onNotifications={() => setScreen("notifications")}
           onSeeShifts={() => setScreen("shifts")}
-          onPublish={() => setScreen("publish")}
+          onPublish={openPublish}
           onOpenShift={openShift}
           onAvailableWaiters={() => setScreen("availableWaiters")}
           onBrowseWaiters={openWaiterDirectory}

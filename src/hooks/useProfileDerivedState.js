@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { WORKER_ROLES } from "../constants/appConstants";
+import { isProfileComplete } from "../utils/profileCompleteness";
 
 export function useProfileDerivedState({
   profile,
@@ -7,32 +8,12 @@ export function useProfileDerivedState({
   waiterForm,
   managerForm,
 }) {
-    const profileComplete = useMemo(() => {
-      if (!profile || !role) return false;
-      if (role === "waiter") {
-        return !!(
-          profile.full_name &&
-          profile.city &&
-          profile.experience !== null &&
-          profile.experience !== undefined &&
-          Number(profile.experience) >= 0 &&
-          Array.isArray(profile.worker_roles) &&
-          profile.worker_roles.length > 0 &&
-          Array.isArray(profile.work_types) &&
-          profile.work_types.length > 0 &&
-          Array.isArray(profile.horeca_skills) &&
-          profile.horeca_skills.length > 0
-        );
-      }
-      return !!(
-        profile.location_name &&
-        profile.location_city &&
-        profile.contact_name &&
-        profile.contact_phone
-      );
-    }, [profile, role]);
+    const profileComplete = useMemo(
+    () => isProfileComplete(profile, role),
+    [profile, role]
+  );
 
-    const waiterFormDirty = useMemo(() => {
+  const waiterFormDirty = useMemo(() => {
       if (!profile || role !== "waiter") return false;
 
       const storedRoles = Array.isArray(profile.worker_roles)
