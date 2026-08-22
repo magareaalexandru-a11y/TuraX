@@ -55,8 +55,107 @@ export default function AuthScreen({
   onLogin,
   onSignup,
   onResetPassword,
+  onUpdatePassword,
 }) {
   const login = authMode === "login";
+  const recovery = authMode === "reset-password";
+
+  const [recoveryPassword, setRecoveryPassword] = useState("");
+  const [recoveryConfirm, setRecoveryConfirm] = useState("");
+  const [recoveryError, setRecoveryError] = useState("");
+  if (recovery) {
+    return (
+      <Shell>
+        <ScreenScroll bottom={40}>
+          <View style={{ alignItems: "center", marginTop: 6 }}>
+            <Image
+              source={require("../../../assets/turax-logo.png")}
+              style={{ width: 288, height: 230 }}
+              resizeMode="contain"
+            />
+          </View>
+
+          <View style={{ marginTop: 24 }}>
+            <Text
+              style={{
+                color: C.text,
+                fontSize: 28,
+                fontWeight: "900",
+                textAlign: "center",
+              }}
+            >
+              Setează parola nouă
+            </Text>
+
+            <Text
+              style={{
+                color: C.muted,
+                fontSize: 14,
+                textAlign: "center",
+                marginTop: 10,
+                marginBottom: 22,
+              }}
+            >
+              Introdu noua parolă pentru contul tău TuraX.
+            </Text>
+
+            <Field
+              label="Parolă nouă"
+              icon="lock-closed-outline"
+              value={recoveryPassword}
+              onChangeText={(value) => {
+                setRecoveryPassword(value);
+                setRecoveryError("");
+              }}
+              placeholder="Parolă nouă"
+              secureTextEntry
+              autoCapitalize="none"
+            />
+
+            <View style={{ marginTop: 16 }}>
+              <Field
+                label="Confirmă parola"
+                icon="lock-closed-outline"
+                value={recoveryConfirm}
+                onChangeText={(value) => {
+                  setRecoveryConfirm(value);
+                  setRecoveryError("");
+                }}
+                placeholder="Confirmă parola"
+                secureTextEntry
+                autoCapitalize="none"
+              />
+            </View>
+
+            <ErrorBox text={recoveryError || message} />
+
+            <Button
+              label={busy ? "Se procesează..." : "Salvează parola"}
+              disabled={busy}
+              icon="key-outline"
+              onPress={async () => {
+                if (recoveryPassword.length < 6) {
+                  setRecoveryError(
+                    "Parola trebuie să aibă cel puțin 6 caractere."
+                  );
+                  return;
+                }
+
+                if (recoveryPassword !== recoveryConfirm) {
+                  setRecoveryError("Parolele introduse nu coincid.");
+                  return;
+                }
+
+                setRecoveryError("");
+                await onUpdatePassword(recoveryPassword);
+              }}
+            />
+          </View>
+        </ScreenScroll>
+      </Shell>
+    );
+  }
+
   return (
     <Shell>
       <ScreenScroll bottom={40}>

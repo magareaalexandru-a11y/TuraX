@@ -142,6 +142,7 @@ export default function App() {
   useAppBootstrap({
     loadProfile,
     setAuthEmail,
+    setAuthMode,
     setRememberMe,
     setSession,
     setRole,
@@ -178,6 +179,7 @@ export default function App() {
     handleLogin,
     handleSignup,
     resetPassword,
+    updateRecoveredPassword,
     handleSignOut,
     handleDeleteAccount,
   } = useAuthActions({
@@ -368,7 +370,7 @@ export default function App() {
     );
   }
 
-  if (!session) {
+  if (!session || authMode === "reset-password") {
     return (
       <AuthScreen
         authMode={authMode}
@@ -388,6 +390,7 @@ export default function App() {
         onLogin={handleLogin}
         onSignup={handleSignup}
         onResetPassword={resetPassword}
+        onUpdatePassword={updateRecoveredPassword}
       />
     );
   }

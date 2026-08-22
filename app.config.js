@@ -1,5 +1,6 @@
 module.exports = ({ config }) => ({
   ...config,
+    scheme: "turax",
   android: {
     ...config.android,
     config: {

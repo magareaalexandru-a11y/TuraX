@@ -1,10 +1,12 @@
 import { useEffect } from "react";
+import { Linking } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { supabase } from "../lib/supabase";
 
 export function useAppBootstrap({
   loadProfile,
   setAuthEmail,
+  setAuthMode,
   setRememberMe,
   setSession,
   setRole,
@@ -15,6 +17,68 @@ export function useAppBootstrap({
 }) {
     useEffect(() => {
       let mounted = true;
+
+
+    const handleRecoveryUrl = async (url) => {
+      if (!url || !url.startsWith("turax://reset-password")) return;
+
+      try {
+        setAuthMode("reset-password");
+        setBooting(true);
+
+        const rawParams = url.includes("#")
+          ? url.split("#")[1]
+          : url.includes("?")
+            ? url.split("?")[1]
+            : "";
+
+        const params = {};
+
+        rawParams.split("&").forEach((part) => {
+          const eq = part.indexOf("=");
+          if (eq === -1) return;
+
+          const key = decodeURIComponent(part.slice(0, eq));
+          const value = decodeURIComponent(part.slice(eq + 1));
+          params[key] = value;
+        });
+
+        const accessToken = params.access_token;
+        const refreshToken = params.refresh_token;
+
+        if (!accessToken || !refreshToken) {
+          throw new Error("Linkul de resetare este invalid sau a expirat.");
+        }
+
+        const { data, error } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        });
+
+        if (error) throw error;
+        if (!mounted) return;
+
+        setSession(data.session);
+        setAuthMode("reset-password");
+        setBooting(false);
+      } catch (e) {
+        if (!mounted) return;
+
+        setAuthMode("login");
+        setBooting(false);
+        setDbError(
+          e?.message || "Linkul de resetare nu a putut fi procesat."
+        );
+      }
+    };
+
+    const linkSubscription = Linking.addEventListener("url", ({ url }) => {
+      handleRecoveryUrl(url);
+    });
+
+    Linking.getInitialURL().then((url) => {
+      if (url) handleRecoveryUrl(url);
+    });
 
       const boot = async () => {
         try {
@@ -51,6 +115,13 @@ export function useAppBootstrap({
       } = supabase.auth.onAuthStateChange((event, nextSession) => {
         if (!mounted) return;
         if (event === "INITIAL_SESSION") return;
+
+      if (event === "PASSWORD_RECOVERY") {
+        setSession(nextSession);
+        setAuthMode("reset-password");
+        setBooting(false);
+        return;
+      }
         if (!nextSession) {
           setSession(null);
           setRole(null);
@@ -72,6 +143,7 @@ export function useAppBootstrap({
       return () => {
         mounted = false;
         subscription.unsubscribe();
+      linkSubscription.remove();
       };
     }, []);
 }

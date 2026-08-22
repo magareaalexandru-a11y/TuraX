@@ -81,8 +81,50 @@ export function useAuthActions({
   const resetPassword = async () => {
     setAuthMessage("");
     if (!isEmail(authEmail)) return setAuthMessage("Introdu întâi adresa de email.");
-    const { error } = await supabase.auth.resetPasswordForEmail(authEmail.trim());
+    const { error } = await supabase.auth.resetPasswordForEmail(authEmail.trim(), {
+      redirectTo: "turax://reset-password",
+    });
     setAuthMessage(error ? error.message : "Instrucțiunile pentru resetarea parolei au fost trimise.");
+  };
+
+  const updateRecoveredPassword = async (newPassword) => {
+    setAuthMessage("");
+
+    if (!newPassword || newPassword.length < 6) {
+      setAuthMessage("Parola nouă trebuie să aibă cel puțin 6 caractere.");
+      return false;
+    }
+
+    setAuthBusy(true);
+
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+
+      if (error) throw error;
+
+      await supabase.auth.signOut({ scope: "local" });
+
+      setSession(null);
+      setProfile(null);
+      setRole(null);
+      setScreen("home");
+      setAuthPassword("");
+      setAuthMode("login");
+      setAuthMessage(
+        "Parola a fost schimbată cu succes. Te poți autentifica."
+      );
+
+      return true;
+    } catch (error) {
+      setAuthMessage(
+        error?.message || "Parola nu a putut fi schimbată."
+      );
+      return false;
+    } finally {
+      setAuthBusy(false);
+    }
   };
 
   const handleSignOut = async () => {
@@ -194,6 +236,7 @@ export function useAuthActions({
     handleLogin,
     handleSignup,
     resetPassword,
+    updateRecoveredPassword,
     handleSignOut,
     handleDeleteAccount,
   };
